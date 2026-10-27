@@ -1,4 +1,4 @@
-package com.example.trap_dash_arena
+package com.itsd85.trapdash
 
 import io.flutter.embedding.android.FlutterActivity
 
