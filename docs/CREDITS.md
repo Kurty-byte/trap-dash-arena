@@ -3,6 +3,7 @@
 *Trap Dash Arena* is built entirely with open-source and permissively licensed free assets.
 
 ## 1. Graphics & Sprites
+* **Level Devil Inspired Minimalist Monotone Aesthetics:** Authentic monotone silhouette and obstacle sprites located in `assets/game/` (player runner, arch exit door, stepped tooth obstacles, rotating sawblades, compression springs, diamond coins, buttons, and bombs).
 * **Kenney Pixel Platformer:** Created by Kenney (kenney.nl) — CC0 1.0 Universal Public Domain.
 * **Custom Sprites:** Created in LibreSprite (GPLv2 / MIT compatible).
 
