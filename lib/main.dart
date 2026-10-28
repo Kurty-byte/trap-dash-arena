@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:trap_dash_arena/autoload/audio_manager.dart';
+import 'package:trap_dash_arena/autoload/game_state.dart';
+import 'package:trap_dash_arena/ui/title_screen.dart';
+import 'package:trap_dash_arena/ui/widgets/arcade_page_route.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +16,10 @@ void main() async {
 
   // Immersive sticky fullscreen mode for mobile arcade gameplay
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+  // Initialize persistence and audio autoload singletons
+  await GameState.instance.init();
+  await AudioManager.instance.init();
 
   runApp(const TrapDashApp());
 }
@@ -27,6 +35,16 @@ class TrapDashApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF10121A),
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: ArcadePageTransitionsBuilder(),
+            TargetPlatform.iOS: ArcadePageTransitionsBuilder(),
+            TargetPlatform.windows: ArcadePageTransitionsBuilder(),
+            TargetPlatform.macOS: ArcadePageTransitionsBuilder(),
+            TargetPlatform.linux: ArcadePageTransitionsBuilder(),
+            TargetPlatform.fuchsia: ArcadePageTransitionsBuilder(),
+          },
+        ),
         fontFamily: 'AtkinsonHyperlegible',
         textTheme: const TextTheme(
           displayLarge: TextStyle(
@@ -51,45 +69,7 @@ class TrapDashApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const Phase1ReadyScreen(),
-    );
-  }
-}
-
-class Phase1ReadyScreen extends StatelessWidget {
-  const Phase1ReadyScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'TRAP DASH ARENA',
-                style: textTheme.displayLarge,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Phase 1 Configured (Landscape 1280x720)',
-                style: textTheme.bodyLarge,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Ready for Phase 2 Autoload Singletons',
-                style: textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
+      home: const TitleScreen(),
     );
   }
 }
