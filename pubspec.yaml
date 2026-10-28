@@ -28,6 +28,7 @@ flutter:
     - assets/images/
     - assets/audio/
     - assets/tiles/
+    - assets/game/
 
   fonts:
     - family: PressStart2P

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="40" height="23" tilewidth="32" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="25">
+ <properties>
+  <property name="levelNumber" type="int" value="3"/>
+  <property name="timeLimit" type="float" value="70.0"/>
+ </properties>
+ <objectgroup id="1" name="Walls">
+  <object id="1" name="CeilingOverhang" x="96" y="72" width="924" height="128"/>
+  <object id="2" name="Floor1" x="96" y="552" width="334" height="200"/>
+  <object id="3" name="Floor2" x="526" y="552" width="264" height="200"/>
+  <object id="4" name="Floor3" x="886" y="552" width="174" height="200"/>
+  <object id="5" name="ExitAlcove" x="1060" y="464" width="124" height="288"/>
+ </objectgroup>
+ <objectgroup id="2" name="Objects">
+  <object id="10" name="Spawn" x="144" y="552" width="24" height="38"/>
+  <object id="11" name="FallingBlock" x="240" y="200" width="40" height="36">
+   <properties>
+    <property name="groundY" type="float" value="552.0"/>
+   </properties>
+  </object>
+  <object id="12" name="FallingBlock" x="350" y="200" width="40" height="36">
+   <properties>
+    <property name="groundY" type="float" value="552.0"/>
+   </properties>
+  </object>
+  <object id="13" name="FakeFloor" x="438" y="552" width="80" height="24"/>
+  <object id="14" name="Checkpoint" x="590" y="552" width="28" height="20">
+   <properties>
+    <property name="checkpointId" type="int" value="1"/>
+   </properties>
+  </object>
+  <object id="15" name="Coin" x="590" y="500" width="18" height="18"/>
+  <object id="16" name="FallingBlock" x="700" y="200" width="40" height="36">
+   <properties>
+    <property name="groundY" type="float" value="552.0"/>
+   </properties>
+  </object>
+  <object id="17" name="DisappearingPlatform" x="802" y="524" width="72" height="20"/>
+  <object id="18" name="FallingBlock" x="930" y="200" width="40" height="36">
+   <properties>
+    <property name="groundY" type="float" value="552.0"/>
+   </properties>
+  </object>
+  <object id="19" name="ExitPortal" x="995" y="552" width="45" height="40">
+   <properties>
+    <property name="isFakeFirst" type="bool" value="true"/>
+    <property name="realX" type="float" value="1132.0"/>
+    <property name="realY" type="float" value="464.0"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>
