@@ -3,6 +3,7 @@ import 'package:trap_dash_arena/autoload/game_state.dart';
 import 'package:trap_dash_arena/autoload/net_manager.dart';
 import 'package:trap_dash_arena/autoload/palette.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
+import 'package:trap_dash_arena/ui/widgets/hud_sprite.dart';
 
 class HudOverlay extends StatelessWidget {
   final TrapDashGame game;
@@ -14,10 +15,11 @@ class HudOverlay extends StatelessWidget {
     final controller = game.controller;
 
     return Positioned.fill(
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          child: Column(
+      child: RepaintBoundary(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Top Bar seated cleanly inside the 72px top solid wall
@@ -30,49 +32,25 @@ class HudOverlay extends StatelessWidget {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Square Pause Button
-                        GestureDetector(
+                        // Pixel-Art Pause Button
+                        HudSpriteButton(
+                          key: const Key('hud_pause_button'),
+                          sprite: HudSpriteType.pause,
+                          size: 32,
+                          tooltip: 'Pause',
                           onTap: () => game.pauseGame(),
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: AppPalette.playerBlack,
-                              border: Border.all(
-                                color: AppPalette.yellowBackground,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.pause,
-                              color: AppPalette.yellowBackground,
-                              size: 18,
-                            ),
-                          ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 4),
 
-                        // Square Quick-Restart Button
-                        GestureDetector(
+                        // Pixel-Art Quick-Restart Button
+                        HudSpriteButton(
+                          key: const Key('hud_restart_button'),
+                          sprite: HudSpriteType.restartCw,
+                          size: 32,
+                          tooltip: 'Restart Level',
                           onTap: () => game.restartLevel(),
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: AppPalette.playerBlack,
-                              border: Border.all(
-                                color: AppPalette.yellowBackground,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.refresh,
-                              color: AppPalette.yellowBackground,
-                              size: 18,
-                            ),
-                          ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
 
                         // Hearts Row
                         ValueListenableBuilder<int>(
@@ -240,9 +218,9 @@ class HudOverlay extends StatelessWidget {
                         ],
 
                         // Timer
-                        ValueListenableBuilder<double>(
-                          valueListenable: controller.timeLeft,
-                          builder: (context, timeVal, _) {
+                        ValueListenableBuilder<int>(
+                          valueListenable: controller.displayTimeSeconds,
+                          builder: (context, secondsVal, _) {
                             return Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -253,7 +231,7 @@ class HudOverlay extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 3),
                                 Text(
-                                  '${timeVal.ceil()}s',
+                                  '${secondsVal}s',
                                   style: const TextStyle(
                                     fontFamily: 'PressStart2P',
                                     fontSize: 12,
@@ -337,6 +315,7 @@ class HudOverlay extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }
