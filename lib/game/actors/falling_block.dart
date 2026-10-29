@@ -26,6 +26,16 @@ class FallingBlock extends PositionComponent
   Sprite? _bombSprite;
 
   late final RectangleHitbox hitbox;
+  late final Rect _rect = size.toRect();
+  late final Offset _lineP1 = Offset(0, size.y - 1);
+  late final Offset _lineP2 = Offset(size.x, size.y - 1);
+
+  static final Paint _warningBlockPaint = Paint()..color = AppPalette.warningRed;
+  static final Paint _defaultBlockPaint = Paint()
+    ..color = Color.lerp(AppPalette.brownSolid, AppPalette.brownDark, 0.35)!;
+  static final Paint _linePaint = Paint()
+    ..color = AppPalette.brownDark
+    ..strokeWidth = 1.5;
 
   FallingBlock({
     required this.trapId,
@@ -42,11 +52,19 @@ class FallingBlock extends PositionComponent
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    hitbox = RectangleHitbox(size: size);
+    hitbox = RectangleHitbox(
+      size: size,
+      collisionType: CollisionType.passive,
+    );
     add(hitbox);
 
     try {
-      _bombSprite = await game.loadSprite('game/bomb.png');
+      final cached = game.tryGetCachedSprite('game/bomb.png');
+      if (cached != null) {
+        _bombSprite = cached;
+      } else {
+        _bombSprite = await game.loadSprite('game/bomb.png');
+      }
     } catch (_) {
       // Fallback for tests
     }
@@ -59,9 +77,11 @@ class FallingBlock extends PositionComponent
     if (!isTriggered && !hasLanded) {
       // Proximity sensor: triggers if player enters within 64px horizontally beneath block
       final player = game.player;
-      final dx = (player.position.x - (position.x + size.x / 2)).abs();
-      if (dx <= 64.0 && player.position.y >= position.y && player.position.y <= groundY + 50) {
-        triggerFall();
+      if (!player.isInDeathCycle) {
+        final dx = (player.position.x - (position.x + size.x / 2)).abs();
+        if (dx <= 64.0 && player.position.y >= position.y && player.position.y <= groundY + 50) {
+          triggerFall();
+        }
       }
     }
 
@@ -103,7 +123,7 @@ class FallingBlock extends PositionComponent
   }
 
   void resetToCeiling() {
-    position = initialPosition.clone();
+    position.setFrom(initialPosition);
     isTriggered = false;
     isFalling = false;
     hasLanded = false;
@@ -112,6 +132,7 @@ class FallingBlock extends PositionComponent
     _shakeOffsetX = 0.0;
     _fallVelocity = 0.0;
     _survivalTimer = 0.50;
+    hitbox.collisionType = CollisionType.passive;
   }
 
   @override
@@ -149,25 +170,25 @@ class FallingBlock extends PositionComponent
 
     final isHighContrast = GameState.instance.highContrastTells;
 
-    canvas.save();
-    canvas.translate(_shakeOffsetX, 0);
+    final hasShake = _shakeOffsetX != 0.0;
+    if (hasShake) {
+      canvas.save();
+      canvas.translate(_shakeOffsetX, 0);
+    }
 
     if (_bombSprite != null && (isFalling || hasLanded)) {
       _bombSprite!.render(canvas, size: size);
     } else {
       // In ceiling: disguised as flat brown ceiling block with slight discolored tell
-      final blockPaint = Paint()
-        ..color = (isRevealed || isHighContrast)
-            ? AppPalette.warningRed
-            : Color.lerp(AppPalette.brownSolid, AppPalette.brownDark, 0.35)!;
-      canvas.drawRect(size.toRect(), blockPaint);
-
-      final linePaint = Paint()
-        ..color = AppPalette.brownDark
-        ..strokeWidth = 1.5;
-      canvas.drawLine(Offset(0, size.y - 1), Offset(size.x, size.y - 1), linePaint);
+      final blockPaint = (isRevealed || isHighContrast)
+          ? _warningBlockPaint
+          : _defaultBlockPaint;
+      canvas.drawRect(_rect, blockPaint);
+      canvas.drawLine(_lineP1, _lineP2, _linePaint);
     }
 
-    canvas.restore();
+    if (hasShake) {
+      canvas.restore();
+    }
   }
 }

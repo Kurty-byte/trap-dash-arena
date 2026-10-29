@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trap_dash_arena/game/chamber_loader.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
 
 void main() {
@@ -52,5 +53,28 @@ void main() {
       expect(game.camera.viewfinder.position.x, equals(640));
       expect(game.camera.viewfinder.position.y, equals(360));
     }
+  });
+
+  test('TrapDashGame provides synchronous image/sprite cache lookups and clearCache works', () async {
+    final game = TrapDashGame(initialLevelNumber: 1);
+    game.images.prefix = 'assets/';
+    final img = await game.images.load('game/obstacle.png');
+    expect(img, isNotNull);
+
+    // Synchronous lookups
+    final cachedImg = game.tryGetCachedImage('game/obstacle.png');
+    expect(cachedImg, equals(img));
+
+    final cachedSprite = game.tryGetCachedSprite('game/obstacle.png');
+    expect(cachedSprite, isNotNull);
+    expect(cachedSprite!.image, equals(img));
+
+    // Non-existent image returns null without throwing
+    expect(game.tryGetCachedImage('game/non_existent.png'), isNull);
+    expect(game.tryGetCachedSprite('game/non_existent.png'), isNull);
+
+    // Chamber cache clear
+    ChamberLoader.clearCache();
+    expect(ChamberLoader.hasCached('tiles/Level01.tmx'), isFalse);
   });
 }

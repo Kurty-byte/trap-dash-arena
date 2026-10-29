@@ -27,6 +27,14 @@ class ChamberLoadResult {
 }
 
 class ChamberLoader {
+  static final Map<String, RenderableTiledMap> _tmxCache = {};
+
+  static void clearCache() {
+    _tmxCache.clear();
+  }
+
+  static bool hasCached(String tmxFile) => _tmxCache.containsKey(tmxFile);
+
   static Future<ChamberLoadResult> loadIntoWorld(
     TrapDashGame game,
     LevelConfig config,
@@ -39,12 +47,17 @@ class ChamberLoader {
       return _loadProgrammaticChamber(game, config.levelNumber);
     }
 
-    // 2. Try loading from Tiled map, fall back to programmatic chamber
+    // 2. Try loading from cached or fresh Tiled map, fall back to programmatic chamber
     try {
-      final tiled = await TiledComponent.load(
-        config.tmxFile,
-        Vector2.all(32),
-      );
+      RenderableTiledMap? map = _tmxCache[config.tmxFile];
+      if (map == null) {
+        map = await RenderableTiledMap.fromFile(
+          config.tmxFile,
+          Vector2.all(32),
+        );
+        _tmxCache[config.tmxFile] = map;
+      }
+      final tiled = TiledComponent(map);
       final result = loadFromTiled(game, tiled);
       if (result != null) return result;
     } catch (_) {

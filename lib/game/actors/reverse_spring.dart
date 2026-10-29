@@ -15,6 +15,24 @@ class ReverseSpring extends PositionComponent
   Sprite? _compressedSprite;
   Sprite? _extendedSprite;
   late final RectangleHitbox hitbox;
+  late final Rect _baseRect = Rect.fromLTWH(0, size.y - 4, size.x, 4);
+  late final Rect _outlineRect = Rect.fromLTWH(0, size.y - 6, size.x, 6);
+  late final Offset _coilP1 = Offset(size.x / 2, size.y - 4);
+  late final Offset _coilP2 = Offset(size.x / 2, 2);
+
+  static final Paint _basePaint = Paint()..color = AppPalette.brownDark;
+  static final Paint _triggeredCoilPaint = Paint()
+    ..color = AppPalette.warningRed
+    ..strokeWidth = 3.0
+    ..style = PaintingStyle.stroke;
+  static final Paint _normalCoilPaint = Paint()
+    ..color = AppPalette.brownSolid
+    ..strokeWidth = 3.0
+    ..style = PaintingStyle.stroke;
+  static final Paint _outlinePaint = Paint()
+    ..color = AppPalette.warningRed
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.0;
 
   ReverseSpring({
     required this.trapId,
@@ -29,13 +47,22 @@ class ReverseSpring extends PositionComponent
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    hitbox = RectangleHitbox(size: size);
+    hitbox = RectangleHitbox(
+      size: size,
+      collisionType: CollisionType.passive,
+    );
     add(hitbox);
 
     try {
-      final img = await game.images.load('game/spring.png');
-      _compressedSprite = Sprite(img, srcPosition: Vector2(0, 0), srcSize: Vector2(90, 80));
-      _extendedSprite = Sprite(img, srcPosition: Vector2(90, 0), srcSize: Vector2(90, 80));
+      final cachedImg = game.tryGetCachedImage('game/spring.png');
+      if (cachedImg != null) {
+        _compressedSprite = Sprite(cachedImg, srcPosition: Vector2(0, 0), srcSize: Vector2(90, 80));
+        _extendedSprite = Sprite(cachedImg, srcPosition: Vector2(90, 0), srcSize: Vector2(90, 80));
+      } else {
+        final img = await game.images.load('game/spring.png');
+        _compressedSprite = Sprite(img, srcPosition: Vector2(0, 0), srcSize: Vector2(90, 80));
+        _extendedSprite = Sprite(img, srcPosition: Vector2(90, 0), srcSize: Vector2(90, 80));
+      }
     } catch (_) {
       // Fallback for tests
     }
@@ -82,22 +109,14 @@ class ReverseSpring extends PositionComponent
       sprite.render(canvas, size: size);
     } else {
       // Fallback
-      final basePaint = Paint()..color = AppPalette.brownDark;
-      canvas.drawRect(Rect.fromLTWH(0, size.y - 4, size.x, 4), basePaint);
+      canvas.drawRect(_baseRect, _basePaint);
 
-      final coilPaint = Paint()
-        ..color = isTriggered ? AppPalette.warningRed : AppPalette.brownSolid
-        ..strokeWidth = 3.0
-        ..style = PaintingStyle.stroke;
-      canvas.drawLine(Offset(size.x / 2, size.y - 4), Offset(size.x / 2, 2), coilPaint);
+      final coilPaint = isTriggered ? _triggeredCoilPaint : _normalCoilPaint;
+      canvas.drawLine(_coilP1, _coilP2, coilPaint);
     }
 
     if (GameState.instance.highContrastTells) {
-      final outlinePaint = Paint()
-        ..color = AppPalette.warningRed
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
-      canvas.drawRect(Rect.fromLTWH(0, size.y - 6, size.x, 6), outlinePaint);
+      canvas.drawRect(_outlineRect, _outlinePaint);
     }
   }
 }

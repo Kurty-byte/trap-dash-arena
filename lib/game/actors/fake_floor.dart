@@ -17,6 +17,26 @@ class FakeFloor extends PositionComponent
   double _survivalTimer = 0.50;
   bool _baitAwarded = false;
   late final RectangleHitbox hitbox;
+  late final Rect _rect = size.toRect();
+  late final Path _crackPath = Path()
+    ..moveTo(size.x * 0.25, 0)
+    ..lineTo(size.x * 0.5, size.y * 0.6)
+    ..lineTo(size.x * 0.8, size.y);
+
+  static final Paint _floorPaint = Paint()..color = AppPalette.brownSolid;
+  static final Paint _revealedCrackPaint = Paint()
+    ..color = AppPalette.warningRed
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.0;
+  static final Paint _subtleCrackPaint = Paint()
+    ..color = AppPalette.yellowBackground.withValues(alpha: 0.6)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.2;
+  static final Paint _borderPaint = Paint()
+    ..color = AppPalette.warningRed
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.0;
+  static final Paint _dustPaint = Paint()..color = AppPalette.brownDark;
 
   FakeFloor({
     required this.trapId,
@@ -27,7 +47,10 @@ class FakeFloor extends PositionComponent
           size: size ?? Vector2(32, 24),
           anchor: Anchor.topLeft,
         ) {
-    hitbox = RectangleHitbox(size: this.size);
+    hitbox = RectangleHitbox(
+      size: this.size,
+      collisionType: CollisionType.passive,
+    );
   }
 
   @override
@@ -73,7 +96,7 @@ class FakeFloor extends PositionComponent
     isRevealed = true; // Retains memory after death so player knows it is a trap!
     _crumbleTimer = 0.30;
     _survivalTimer = 0.50;
-    hitbox.collisionType = CollisionType.active;
+    hitbox.collisionType = CollisionType.passive;
   }
 
   @override
@@ -101,38 +124,25 @@ class FakeFloor extends PositionComponent
     final isHighContrast = GameState.instance.highContrastTells;
 
     // Disguised as solid brown floor
-    final floorPaint = Paint()..color = AppPalette.brownSolid;
-    canvas.drawRect(size.toRect(), floorPaint);
+    canvas.drawRect(_rect, _floorPaint);
 
     // Crack tell (1.5px hairline crack in background yellow)
-    final crackPaint = Paint()
-      ..color = (isHighContrast || isRevealed)
-          ? AppPalette.warningRed
-          : AppPalette.yellowBackground.withValues(alpha: 0.6)
-      ..strokeWidth = (isHighContrast || isRevealed) ? 2.0 : 1.2;
-
-    final crackPath = Path()
-      ..moveTo(size.x * 0.25, 0)
-      ..lineTo(size.x * 0.5, size.y * 0.6)
-      ..lineTo(size.x * 0.8, size.y);
-    canvas.drawPath(crackPath, crackPaint);
+    final crackPaint = (isHighContrast || isRevealed)
+        ? _revealedCrackPaint
+        : _subtleCrackPaint;
+    canvas.drawPath(_crackPath, crackPaint);
 
     if (isRevealed || isHighContrast) {
-      final borderPaint = Paint()
-        ..color = AppPalette.warningRed
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
-      canvas.drawRect(size.toRect(), borderPaint);
+      canvas.drawRect(_rect, _borderPaint);
     }
 
     // Dust particles emitting downward during crumbling window
     if (isStepped && !isCrumbled) {
-      final dustPaint = Paint()..color = AppPalette.brownDark;
       final progress = 1.0 - (_crumbleTimer / 0.30);
       final dropY = size.y + (progress * 14.0);
-      canvas.drawCircle(Offset(size.x * 0.2, dropY), 1.5, dustPaint);
-      canvas.drawCircle(Offset(size.x * 0.5, dropY + 2.0), 2.0, dustPaint);
-      canvas.drawCircle(Offset(size.x * 0.8, dropY - 1.0), 1.5, dustPaint);
+      canvas.drawCircle(Offset(size.x * 0.2, dropY), 1.5, _dustPaint);
+      canvas.drawCircle(Offset(size.x * 0.5, dropY + 2.0), 2.0, _dustPaint);
+      canvas.drawCircle(Offset(size.x * 0.8, dropY - 1.0), 1.5, _dustPaint);
     }
   }
 }

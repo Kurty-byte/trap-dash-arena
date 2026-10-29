@@ -27,11 +27,21 @@ class ExitPortal extends PositionComponent
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    add(RectangleHitbox(size: size));
+    add(RectangleHitbox(
+      size: size,
+      collisionType: CollisionType.passive,
+    ));
 
     try {
-      _doorSprite = await game.loadSprite('game/door.png');
-      _teleportSprite = await game.loadSprite('game/teleport.png');
+      final cachedDoor = game.tryGetCachedSprite('game/door.png');
+      final cachedTeleport = game.tryGetCachedSprite('game/teleport.png');
+      if (cachedDoor != null && cachedTeleport != null) {
+        _doorSprite = cachedDoor;
+        _teleportSprite = cachedTeleport;
+      } else {
+        _doorSprite = cachedDoor ?? await game.loadSprite('game/door.png');
+        _teleportSprite = cachedTeleport ?? await game.loadSprite('game/teleport.png');
+      }
     } catch (_) {
       // Fallback for tests
     }

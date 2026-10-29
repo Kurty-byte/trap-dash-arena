@@ -62,6 +62,7 @@ class CreditsScreen extends StatelessWidget {
                       _buildCreditSection('Visual Art & Game Design', [
                         'Minimalist Monotone Aesthetics inspired by Level Devil (Unept)',
                         'Game sprites in assets/game/ (player, door, obstacles, saws, springs)',
+                        'HUD icon sprites in assets/game/hud.png — Thomas / Mewily (mewily.itch.io)',
                       ]),
                       const SizedBox(height: 12),
 

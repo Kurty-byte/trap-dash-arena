@@ -19,6 +19,12 @@ class MainMenuScreen extends StatefulWidget {
 
 class _MainMenuScreenState extends State<MainMenuScreen> {
   @override
+  void initState() {
+    super.initState();
+    AudioManager.instance.playBgm('bgm.mp3');
+  }
+
+  @override
   Widget build(BuildContext context) {
     final unlocked = GameState.instance.unlockedLevel;
 

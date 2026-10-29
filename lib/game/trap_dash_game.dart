@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
@@ -39,6 +40,7 @@ class TrapDashGame extends FlameGame
 
   double _netUpdateTimer = 0.0;
   int _lastReportedScore = -1;
+  double _lastReportedProgress = -1.0;
   bool _reportedFinished = false;
 
   TrapDashGame({int? initialLevelNumber, int? currentLevelNumber})
@@ -75,6 +77,23 @@ class TrapDashGame extends FlameGame
     camera.viewfinder.anchor = Anchor.center;
     camera.viewfinder.position = viewportCenter.clone();
     await loadLevel(currentLevelNumber);
+  }
+
+  ui.Image? tryGetCachedImage(String path) {
+    try {
+      if (images.containsKey(path)) {
+        return images.fromCache(path);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Sprite? tryGetCachedSprite(String path, {Vector2? srcPosition, Vector2? srcSize}) {
+    final img = tryGetCachedImage(path);
+    if (img != null) {
+      return Sprite(img, srcPosition: srcPosition, srcSize: srcSize);
+    }
+    return null;
   }
 
   Future<void> loadLevel(int levelNumber) async {
@@ -120,24 +139,34 @@ class TrapDashGame extends FlameGame
 
     _netUpdateTimer = 0.0;
     _lastReportedScore = -1;
+    _lastReportedProgress = -1.0;
     _reportedFinished = false;
-
-    audio.playBgm('bgm.ogg');
   }
 
   void onPlayerHurt() {
     controller.onPlayerHurt();
     audio.playSfx('hurt.wav');
     shakeCamera(intensity: 12.0, duration: 0.35);
+  }
 
-    if (controller.hearts.value > 0) {
-      respawnPlayerAtCheckpoint();
+  void onPlayerReadyToRespawn() {
+    if (!controller.isGameOver.value) {
+      if (overlays.registeredOverlays.contains('RespawnOverlay')) {
+        overlays.add('RespawnOverlay');
+      }
     }
   }
 
-  void respawnPlayerAtCheckpoint() {
-    player.respawnAt(lastCheckpointPosition);
+  void triggerRespawn() {
+    if (!player.isAwaitingRespawn || controller.isGameOver.value) return;
+    if (overlays.isActive('RespawnOverlay')) {
+      overlays.remove('RespawnOverlay');
+    }
+    audio.playSfx('unlock.wav');
+    respawnPlayerAtCheckpoint(playReintegration: true);
+  }
 
+  void respawnPlayerAtCheckpoint({bool playReintegration = true}) {
     for (final child in world.children) {
       if (child is FakeFloor) {
         child.resetToSolid();
@@ -147,9 +176,14 @@ class TrapDashGame extends FlameGame
         child.resetToCeiling();
       } else if (child is DisappearingPlatform) {
         child.isPlatformSolid = true;
-        child.hitbox.collisionType = CollisionType.active;
+        child.hitbox.collisionType = CollisionType.passive;
       }
     }
+
+    player.respawnAt(
+      lastCheckpointPosition,
+      playReintegration: playReintegration,
+    );
   }
 
   void shakeCamera({double intensity = 10.0, double duration = 0.35}) {
@@ -167,8 +201,9 @@ class TrapDashGame extends FlameGame
   }
 
   Future<void> restartLevel() async {
-    overlays.remove('PauseOverlay');
-    overlays.remove('ResultOverlay');
+    if (overlays.isActive('PauseOverlay')) overlays.remove('PauseOverlay');
+    if (overlays.isActive('ResultOverlay')) overlays.remove('ResultOverlay');
+    if (overlays.isActive('RespawnOverlay')) overlays.remove('RespawnOverlay');
     if (paused) {
       resumeEngine();
     }
@@ -180,16 +215,21 @@ class TrapDashGame extends FlameGame
     super.update(dt);
     controller.update(dt);
 
-    // Update runner progress normalized (0.0 to 1.0)
+    // Update runner progress normalized (0.0 to 1.0) with thresholding
     final span = max(1.0, _exitX - startSpawnPosition.x);
     final progressVal = min(1.0, max(0.0, (player.position.x - startSpawnPosition.x) / span));
-    controller.progress.value = progressVal;
+    if ((progressVal - controller.progress.value).abs() >= 0.005 || progressVal == 0.0 || progressVal == 1.0) {
+      controller.progress.value = progressVal;
+    }
 
     // Report network multiplayer score and progress
     if (GameState.instance.mode == 'online' && NetManager.instance.isConnected.value) {
       _netUpdateTimer += dt;
-      if (controller.score.value != _lastReportedScore || _netUpdateTimer >= 0.25) {
+      final scoreChanged = controller.score.value != _lastReportedScore;
+      final progressChanged = (progressVal - _lastReportedProgress).abs() >= 0.01;
+      if (scoreChanged || (_netUpdateTimer >= 0.25 && progressChanged)) {
         _lastReportedScore = controller.score.value;
+        _lastReportedProgress = progressVal;
         _netUpdateTimer = 0.0;
         NetManager.instance.sendScore(
           score: controller.score.value,
@@ -207,23 +247,32 @@ class TrapDashGame extends FlameGame
     }
 
     // Trigger ResultOverlay when level ends (loss or victory)
-    if (controller.isGameOver.value && !overlays.isActive('ResultOverlay')) {
+    if (controller.isGameOver.value &&
+        !player.isDisintegrating &&
+        !overlays.isActive('ResultOverlay')) {
+      if (overlays.isActive('RespawnOverlay')) {
+        overlays.remove('RespawnOverlay');
+      }
       pauseEngine();
-      overlays.add('ResultOverlay');
+      if (overlays.registeredOverlays.contains('ResultOverlay')) {
+        overlays.add('ResultOverlay');
+      }
     }
 
-    // Screen shake around fixed viewport center (zero cumulative drift)
+    // Screen shake around fixed viewport center (zero cumulative drift, idle guard)
     if (_trauma > 0) {
       _trauma = max(0.0, _trauma - dt * 2.0);
-      final shake = _trauma * _trauma * 14.0;
-      final offsetX = (_random.nextDouble() * 2 - 1) * shake;
-      final offsetY = (_random.nextDouble() * 2 - 1) * shake;
-      camera.viewfinder.position = Vector2(
-        viewportCenter.x + offsetX,
-        viewportCenter.y + offsetY,
-      );
-    } else {
-      camera.viewfinder.position = viewportCenter.clone();
+      if (_trauma > 0) {
+        final shake = _trauma * _trauma * 14.0;
+        final offsetX = (_random.nextDouble() * 2 - 1) * shake;
+        final offsetY = (_random.nextDouble() * 2 - 1) * shake;
+        camera.viewfinder.position.setValues(
+          viewportCenter.x + offsetX,
+          viewportCenter.y + offsetY,
+        );
+      } else {
+        camera.viewfinder.position.setFrom(viewportCenter);
+      }
     }
   }
 
@@ -238,6 +287,15 @@ class TrapDashGame extends FlameGame
       } else {
         pauseGame();
       }
+      return KeyEventResult.handled;
+    }
+
+    if (player.isAwaitingRespawn &&
+        event is KeyDownEvent &&
+        (event.logicalKey == LogicalKeyboardKey.space ||
+            event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.keyR)) {
+      triggerRespawn();
       return KeyEventResult.handled;
     }
 

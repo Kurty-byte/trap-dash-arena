@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,10 @@ class MovingSaw extends PositionComponent
   final Vector2 pathStart;
   final Vector2 pathEnd;
   final double speed;
+
+  late final double _totalDistance;
+  late final double _pathDeltaX;
+  late final double _pathDeltaY;
 
   double _t = 0.0;
   int _direction = 1;
@@ -27,7 +32,11 @@ class MovingSaw extends PositionComponent
           position: pathStart.clone(),
           size: Vector2.all(radius * 2),
           anchor: Anchor.center,
-        );
+        ) {
+    _pathDeltaX = pathEnd.x - pathStart.x;
+    _pathDeltaY = pathEnd.y - pathStart.y;
+    _totalDistance = sqrt(_pathDeltaX * _pathDeltaX + _pathDeltaY * _pathDeltaY);
+  }
 
   @override
   Future<void> onLoad() async {
@@ -35,11 +44,17 @@ class MovingSaw extends PositionComponent
     hitbox = CircleHitbox(
       radius: size.x / 2 - 2,
       position: Vector2.all(2),
+      collisionType: CollisionType.passive,
     );
     add(hitbox);
 
     try {
-      _sawSprite = await game.loadSprite('game/sew.png');
+      final cached = game.tryGetCachedSprite('game/sew.png');
+      if (cached != null) {
+        _sawSprite = cached;
+      } else {
+        _sawSprite = await game.loadSprite('game/sew.png');
+      }
     } catch (_) {
       // Fallback for tests
     }
@@ -49,9 +64,8 @@ class MovingSaw extends PositionComponent
   void update(double dt) {
     super.update(dt);
 
-    final totalDistance = (pathEnd - pathStart).length;
-    if (totalDistance > 0) {
-      _t += (_direction * speed * dt) / totalDistance;
+    if (_totalDistance > 0) {
+      _t += (_direction * speed * dt) / _totalDistance;
       if (_t >= 1.0) {
         _t = 1.0;
         _direction = -1;
@@ -59,7 +73,10 @@ class MovingSaw extends PositionComponent
         _t = 0.0;
         _direction = 1;
       }
-      position = pathStart + (pathEnd - pathStart) * _t;
+      position.setValues(
+        pathStart.x + _pathDeltaX * _t,
+        pathStart.y + _pathDeltaY * _t,
+      );
     }
 
     _rotationAngle += dt * 12.0;

@@ -1,7 +1,17 @@
+import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trap_dash_arena/game/actors/checkpoint_flag.dart';
+import 'package:trap_dash_arena/game/actors/disappearing_platform.dart';
+import 'package:trap_dash_arena/game/actors/exit_portal.dart';
+import 'package:trap_dash_arena/game/actors/fake_floor.dart';
+import 'package:trap_dash_arena/game/actors/falling_block.dart';
 import 'package:trap_dash_arena/game/actors/ground_block.dart';
+import 'package:trap_dash_arena/game/actors/moving_saw.dart';
+import 'package:trap_dash_arena/game/actors/pickup_item.dart';
 import 'package:trap_dash_arena/game/actors/player.dart';
+import 'package:trap_dash_arena/game/actors/reverse_spring.dart';
+import 'package:trap_dash_arena/game/actors/trap_spike.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
 
 void main() {
@@ -95,6 +105,48 @@ void main() {
       expect(player.position.x, equals(150));
       expect(player.velocity.x, equals(0));
       expect(player.isOnGround, isTrue);
+    });
+  });
+
+  group('Collision Broadphase Passive Hitbox Tests', () {
+    test('Non-player obstacles and pickups use CollisionType.passive', () async {
+      final ground = GroundBlock(position: Vector2.zero(), size: Vector2(32, 32));
+      final fakeFloor = FakeFloor(trapId: 'ff1', position: Vector2.zero());
+      final disappear = DisappearingPlatform(position: Vector2.zero(), size: Vector2(32, 16));
+      final spike = TrapSpike(trapId: 's1', position: Vector2.zero());
+      final falling = FallingBlock(trapId: 'fb1', position: Vector2.zero(), groundY: 100);
+      final saw = MovingSaw(pathStart: Vector2.zero(), pathEnd: Vector2(100, 0));
+      final flag = CheckpointFlag(checkpointId: 1, position: Vector2.zero());
+      final pickup = PickupItem(type: PickupType.coin, position: Vector2.zero());
+      final spring = ReverseSpring(trapId: 'sp1', position: Vector2.zero());
+      final portal = ExitPortal(position: Vector2.zero());
+
+      await fakeFloor.onLoad();
+      await disappear.onLoad();
+      await spike.onLoad();
+      await falling.onLoad();
+      await saw.onLoad();
+      await flag.onLoad();
+      await pickup.onLoad();
+      await spring.onLoad();
+      await portal.onLoad();
+
+      expect(ground.children.whereType<ShapeHitbox>().first.collisionType, equals(CollisionType.passive));
+      expect(fakeFloor.hitbox.collisionType, equals(CollisionType.passive));
+      expect(disappear.hitbox.collisionType, equals(CollisionType.passive));
+      expect(spike.hitbox.collisionType, equals(CollisionType.passive));
+      expect(falling.hitbox.collisionType, equals(CollisionType.passive));
+      expect(saw.hitbox.collisionType, equals(CollisionType.passive));
+      expect(flag.children.whereType<ShapeHitbox>().first.collisionType, equals(CollisionType.passive));
+      expect(pickup.children.whereType<ShapeHitbox>().first.collisionType, equals(CollisionType.passive));
+      expect(spring.hitbox.collisionType, equals(CollisionType.passive));
+      expect(portal.children.whereType<ShapeHitbox>().first.collisionType, equals(CollisionType.passive));
+
+      // Reset to solid maintains passive collision
+      fakeFloor.crumble();
+      expect(fakeFloor.hitbox.collisionType, equals(CollisionType.inactive));
+      fakeFloor.resetToSolid();
+      expect(fakeFloor.hitbox.collisionType, equals(CollisionType.passive));
     });
   });
 }

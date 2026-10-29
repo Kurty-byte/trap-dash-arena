@@ -29,10 +29,18 @@ class PickupItem extends PositionComponent
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    add(CircleHitbox(radius: 9));
+    add(CircleHitbox(
+      radius: 9,
+      collisionType: CollisionType.passive,
+    ));
 
     try {
-      _coinSprite = await game.loadSprite('game/coin.png');
+      final cached = game.tryGetCachedSprite('game/coin.png');
+      if (cached != null) {
+        _coinSprite = cached;
+      } else {
+        _coinSprite = await game.loadSprite('game/coin.png');
+      }
     } catch (_) {
       // Fallback for tests
     }

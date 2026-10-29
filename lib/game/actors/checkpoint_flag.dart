@@ -24,12 +24,21 @@ class CheckpointFlag extends PositionComponent
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    add(RectangleHitbox(size: size));
+    add(RectangleHitbox(
+      size: size,
+      collisionType: CollisionType.passive,
+    ));
 
     try {
-      final img = await game.images.load('game/button.png');
-      _unpressedSprite = Sprite(img, srcPosition: Vector2(0, 0), srcSize: Vector2(40, 32));
-      _pressedSprite = Sprite(img, srcPosition: Vector2(40, 0), srcSize: Vector2(40, 32));
+      final cachedImg = game.tryGetCachedImage('game/button.png');
+      if (cachedImg != null) {
+        _unpressedSprite = Sprite(cachedImg, srcPosition: Vector2(0, 0), srcSize: Vector2(40, 32));
+        _pressedSprite = Sprite(cachedImg, srcPosition: Vector2(40, 0), srcSize: Vector2(40, 32));
+      } else {
+        final img = await game.images.load('game/button.png');
+        _unpressedSprite = Sprite(img, srcPosition: Vector2(0, 0), srcSize: Vector2(40, 32));
+        _pressedSprite = Sprite(img, srcPosition: Vector2(40, 0), srcSize: Vector2(40, 32));
+      }
     } catch (_) {
       // Fallback for tests
     }

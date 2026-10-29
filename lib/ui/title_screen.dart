@@ -21,6 +21,7 @@ class _TitleScreenState extends State<TitleScreen>
   @override
   void initState() {
     super.initState();
+    AudioManager.instance.playBgm('bgm.mp3');
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),

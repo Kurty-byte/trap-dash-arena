@@ -13,7 +13,7 @@ class GroundBlock extends PositionComponent with CollisionCallbacks {
           position: position,
           size: size,
           anchor: Anchor.topLeft,
-          children: [RectangleHitbox(size: size)],
+          children: [RectangleHitbox(size: size, collisionType: CollisionType.passive)],
         );
 
   @override

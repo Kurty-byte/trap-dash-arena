@@ -1,9 +1,11 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:trap_dash_arena/autoload/audio_manager.dart';
 import 'package:trap_dash_arena/autoload/palette.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
 import 'package:trap_dash_arena/ui/hud_overlay.dart';
 import 'package:trap_dash_arena/ui/pause_overlay.dart';
+import 'package:trap_dash_arena/ui/respawn_overlay.dart';
 import 'package:trap_dash_arena/ui/result_screen.dart';
 import 'package:trap_dash_arena/ui/touch_controls_overlay.dart';
 
@@ -22,7 +24,14 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
+    AudioManager.instance.enterGameplay();
     _game = TrapDashGame(currentLevelNumber: widget.levelNumber);
+  }
+
+  @override
+  void dispose() {
+    AudioManager.instance.exitGameplay();
+    super.dispose();
   }
 
   Widget _buildLoadingIndicator() {
@@ -86,6 +95,7 @@ class _GameScreenState extends State<GameScreen> {
           overlayBuilderMap: {
             'Hud': (context, game) => HudOverlay(game: game),
             'TouchControls': (context, game) => TouchControlsOverlay(game: game),
+            'RespawnOverlay': (context, game) => RespawnOverlay(game: game),
             'PauseOverlay': (context, game) => PauseOverlay(game: game),
             'ResultOverlay': (context, game) => ResultOverlay(game: game),
             'LoadingOverlay': (context, game) => _buildLoadingIndicator(),

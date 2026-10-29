@@ -23,6 +23,16 @@ class TrapSpike extends PositionComponent
   Sprite? _obstacleSprite;
 
   late final RectangleHitbox hitbox;
+  late final Rect _boundsRect = Rect.fromLTWH(0, 0, size.x, size.y);
+  late final Rect _warningRect = Rect.fromLTWH(0, size.y - 4, size.x, 4);
+  final Vector2 _renderPos = Vector2.zero();
+
+  static final Paint _solidPaint = Paint()..color = AppPalette.brownSolid;
+  static final Paint _darkPaint = Paint()..color = AppPalette.brownDark;
+  static final Paint _warningPaint = Paint()
+    ..color = AppPalette.warningRed
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.0;
 
   TrapSpike({
     required this.trapId,
@@ -44,11 +54,17 @@ class TrapSpike extends PositionComponent
     hitbox = RectangleHitbox(
       size: Vector2(size.x - 4, size.y - 2),
       position: Vector2(2, 2),
+      collisionType: CollisionType.passive,
     );
     add(hitbox);
 
     try {
-      _obstacleSprite = await game.loadSprite('game/obstacle.png');
+      final cached = game.tryGetCachedSprite('game/obstacle.png');
+      if (cached != null) {
+        _obstacleSprite = cached;
+      } else {
+        _obstacleSprite = await game.loadSprite('game/obstacle.png');
+      }
     } catch (_) {
       // Fallback for tests
     }
@@ -59,11 +75,12 @@ class TrapSpike extends PositionComponent
     super.update(dt);
 
     if (!isStatic && !isTriggered && !isExtended) {
-      // Proximity check (48 px radius from player)
+      // Proximity check (48 px radius from player, 48^2 = 2304)
       final player = game.player;
-      final distance = (player.position - position).length;
-      if (distance <= 48.0) {
-        triggerJitter();
+      if (!player.isInDeathCycle) {
+        if (player.position.distanceToSquared(position) <= 2304.0) {
+          triggerJitter();
+        }
       }
     }
 
@@ -124,24 +141,31 @@ class TrapSpike extends PositionComponent
 
     final isHighContrast = GameState.instance.highContrastTells;
 
-    canvas.save();
-    canvas.translate(_jitterOffsetX, 0);
+    final hasJitter = _jitterOffsetX != 0.0;
+    if (hasJitter) {
+      canvas.save();
+      canvas.translate(_jitterOffsetX, 0);
+    }
 
     final isVisible = isExtended || isStatic;
     final yOffset = isVisible ? 0.0 : (isTriggered ? size.y - 10 : size.y - 4);
 
     if (_obstacleSprite != null) {
-      // Render Level Devil obstacle sprite with vertical shift for pop-up effect
-      canvas.clipRect(Rect.fromLTWH(0, 0, size.x, size.y));
+      if (!isVisible) {
+        canvas.save();
+        canvas.clipRect(_boundsRect);
+      }
+      _renderPos.setValues(0, yOffset);
       _obstacleSprite!.render(
         canvas,
-        position: Vector2(0, yOffset),
+        position: _renderPos,
         size: size,
       );
+      if (!isVisible) {
+        canvas.restore();
+      }
     } else {
-      // Fallback
-      final paint = Paint()
-        ..color = isVisible ? AppPalette.brownSolid : AppPalette.brownDark;
+      final paint = isVisible ? _solidPaint : _darkPaint;
       final stepW = size.x / 3;
       final h = isVisible ? size.y : 4.0;
       for (int i = 0; i < 3; i++) {
@@ -154,13 +178,11 @@ class TrapSpike extends PositionComponent
 
     // High-contrast or revealed warning outline
     if (isRevealed || isHighContrast) {
-      final warningPaint = Paint()
-        ..color = AppPalette.warningRed
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
-      canvas.drawRect(Rect.fromLTWH(0, size.y - 4, size.x, 4), warningPaint);
+      canvas.drawRect(_warningRect, _warningPaint);
     }
 
-    canvas.restore();
+    if (hasJitter) {
+      canvas.restore();
+    }
   }
 }

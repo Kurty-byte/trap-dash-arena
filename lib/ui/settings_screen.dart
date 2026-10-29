@@ -26,6 +26,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
+    final name = _nameController.text.trim();
+    if (name.isNotEmpty) {
+      GameState.instance.setPlayerNickname(name);
+    }
     _nameController.dispose();
     super.dispose();
   }
@@ -115,6 +119,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     hintText: 'Enter name',
                                   ),
                                   onChanged: (val) {
+                                    GameState.instance.playerNickname = val.trim();
+                                  },
+                                  onSubmitted: (val) {
                                     GameState.instance.setPlayerNickname(val.trim());
                                   },
                                 ),

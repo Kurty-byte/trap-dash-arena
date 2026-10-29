@@ -13,6 +13,21 @@ class DisappearingPlatform extends PositionComponent with CollisionCallbacks {
   double _timer = 0.0;
   bool _isBlinking = false;
   late final RectangleHitbox hitbox;
+  late final Rect _rect = size.toRect();
+
+  static final Paint _contrastOutlinePaint = Paint()
+    ..color = AppPalette.warningRed
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.0;
+  static final Paint _ghostOutlinePaint = Paint()
+    ..color = AppPalette.brownDark.withValues(alpha: 0.3)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.0;
+  final Paint _basePaint = Paint()..color = AppPalette.brownSolid;
+  final Paint _borderPaint = Paint()
+    ..color = AppPalette.brownDark
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5;
 
   DisappearingPlatform({
     required Vector2 position,
@@ -24,7 +39,10 @@ class DisappearingPlatform extends PositionComponent with CollisionCallbacks {
           size: size,
           anchor: Anchor.topLeft,
         ) {
-    hitbox = RectangleHitbox(size: this.size);
+    hitbox = RectangleHitbox(
+      size: this.size,
+      collisionType: CollisionType.passive,
+    );
   }
 
   @override
@@ -52,7 +70,7 @@ class DisappearingPlatform extends PositionComponent with CollisionCallbacks {
       if (_timer >= invisibleDuration) {
         isPlatformSolid = true;
         _timer = 0.0;
-        hitbox.collisionType = CollisionType.active;
+        hitbox.collisionType = CollisionType.passive;
       }
     }
   }
@@ -79,26 +97,20 @@ class DisappearingPlatform extends PositionComponent with CollisionCallbacks {
 
     if (!isPlatformSolid) {
       // Ghosted dashed outline when inactive
-      final outlinePaint = Paint()
-        ..color = GameState.instance.highContrastTells
-            ? AppPalette.warningRed
-            : AppPalette.brownDark.withValues(alpha: 0.3)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
-      canvas.drawRect(size.toRect(), outlinePaint);
+      final outlinePaint = GameState.instance.highContrastTells
+          ? _contrastOutlinePaint
+          : _ghostOutlinePaint;
+      canvas.drawRect(_rect, outlinePaint);
       return;
     }
 
     // Blinking effect before vanishing
     final alpha = (_isBlinking && ((_timer * 10).toInt() % 2 == 0)) ? 80 : 255;
 
-    final basePaint = Paint()..color = AppPalette.brownSolid.withAlpha(alpha);
-    canvas.drawRect(size.toRect(), basePaint);
+    _basePaint.color = AppPalette.brownSolid.withAlpha(alpha);
+    canvas.drawRect(_rect, _basePaint);
 
-    final borderPaint = Paint()
-      ..color = AppPalette.brownDark.withAlpha(alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    canvas.drawRect(size.toRect(), borderPaint);
+    _borderPaint.color = AppPalette.brownDark.withAlpha(alpha);
+    canvas.drawRect(_rect, _borderPaint);
   }
 }
