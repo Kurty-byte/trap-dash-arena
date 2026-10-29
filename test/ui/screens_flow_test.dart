@@ -7,7 +7,9 @@ import 'package:trap_dash_arena/ui/level_select_screen.dart';
 import 'package:trap_dash_arena/ui/main_menu_screen.dart';
 import 'package:trap_dash_arena/ui/mode_select_screen.dart';
 import 'package:trap_dash_arena/ui/settings_screen.dart';
+import 'package:trap_dash_arena/ui/widgets/hazard_background.dart';
 import 'package:trap_dash_arena/ui/widgets/square_toggle.dart';
+import 'package:trap_dash_arena/ui/widgets/vertical_flip_ticker.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -18,9 +20,12 @@ void main() {
   });
 
   group('UI Screens Navigation and Offline Flow Tests', () {
-    testWidgets('MainMenuScreen renders title and navigation buttons', (tester) async {
+    testWidgets('MainMenuScreen renders title, ticker, and hazards in non-scrollable frame', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: MainMenuScreen()));
 
+      expect(find.byType(SingleChildScrollView), findsNothing);
+      expect(find.byType(HazardBackground), findsOneWidget);
+      expect(find.byType(VerticalFlipTicker), findsOneWidget);
       expect(find.text('TRAP DASH'), findsOneWidget);
       expect(find.text('ARENA'), findsOneWidget);
       expect(find.text('PLAY GAME'), findsOneWidget);
@@ -34,14 +39,16 @@ void main() {
       await tester.pumpWidget(const MaterialApp(home: MainMenuScreen()));
 
       await tester.tap(find.byKey(const Key('exit_game_button')));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('EXIT GAME?'), findsOneWidget);
       expect(find.text('Are you sure you want to exit Trap Dash Arena?'), findsOneWidget);
       expect(find.text('CANCEL'), findsOneWidget);
 
       await tester.tap(find.text('CANCEL'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('EXIT GAME?'), findsNothing);
       expect(find.byType(MainMenuScreen), findsOneWidget);
@@ -51,7 +58,8 @@ void main() {
       await tester.pumpWidget(const MaterialApp(home: MainMenuScreen()));
 
       await tester.tap(find.byKey(const Key('exit_game_button')));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('EXIT GAME?'), findsOneWidget);
 
@@ -60,7 +68,8 @@ void main() {
       expect(exitDialogButton, findsOneWidget);
 
       await tester.tap(exitDialogButton);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('EXIT GAME?'), findsNothing);
     });
@@ -151,6 +160,8 @@ void main() {
 
       expect(find.text('RESET PROGRESS?'), findsNothing);
       expect(GameState.instance.unlockedLevel, 1);
+      expect(find.byKey(const Key('arcade_toast_banner')), findsOneWidget);
+      expect(find.text('Progress reset to Level 1.'), findsOneWidget);
     });
   });
 }
