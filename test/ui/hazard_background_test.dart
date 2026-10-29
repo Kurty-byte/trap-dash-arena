@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:trap_dash_arena/ui/widgets/hazard_background.dart';
 
 void main() {
-  testWidgets('HazardBackground renders child widget and custom paint layer',
+  testWidgets('HazardBackground renders child widget and asset images with low opacity',
       (WidgetTester tester) async {
     bool tapped = false;
 
@@ -11,6 +11,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: HazardBackground(
+            opacity: 0.13,
             child: ElevatedButton(
               onPressed: () => tapped = true,
               child: const Text('TAP_ME'),
@@ -21,7 +22,7 @@ void main() {
     );
 
     expect(find.text('TAP_ME'), findsOneWidget);
-    expect(find.byType(CustomPaint), findsWidgets);
+    expect(find.byType(Image), findsWidgets);
 
     // Verify touch events pass through to child
     await tester.tap(find.text('TAP_ME'));
