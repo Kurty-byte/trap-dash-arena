@@ -3,6 +3,8 @@ import 'package:trap_dash_arena/autoload/audio_manager.dart';
 import 'package:trap_dash_arena/autoload/palette.dart';
 import 'package:trap_dash_arena/ui/main_menu_screen.dart';
 import 'package:trap_dash_arena/ui/widgets/arcade_page_route.dart';
+import 'package:trap_dash_arena/ui/widgets/hazard_background.dart';
+import 'package:trap_dash_arena/ui/widgets/vertical_flip_ticker.dart';
 
 class TitleScreen extends StatefulWidget {
   final VoidCallback? onStart;
@@ -53,66 +55,73 @@ class _TitleScreenState extends State<TitleScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppPalette.yellowBackground,
-      body: SafeArea(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: _handleTapToStart,
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Level Devil icon image
-                Image.asset(
-                  'assets/game/icon.png',
-                  width: 80,
-                  height: 80,
-                  filterQuality: FilterQuality.none,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const SizedBox(width: 80, height: 80),
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'TRAP DASH ARENA',
-                  style: TextStyle(
-                    fontFamily: 'PressStart2P',
-                    fontSize: 26,
-                    color: AppPalette.playerBlack,
-                    letterSpacing: 2,
+      body: HazardBackground(
+        child: SafeArea(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _handleTapToStart,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Level Devil icon image
+                  Image.asset(
+                    'assets/game/icon.png',
+                    width: 80,
+                    height: 80,
+                    filterQuality: FilterQuality.none,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox(width: 80, height: 80),
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Deceptive Platformer & Score-Rush',
-                  style: TextStyle(
-                    fontFamily: 'AtkinsonHyperlegible',
-                    fontSize: 16,
-                    color: AppPalette.brownDark,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 36),
-                AnimatedBuilder(
-                  animation: _pulseAnimation,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: _pulseAnimation.value,
-                      child: child,
-                    );
-                  },
-                  child: const Text(
-                    'TAP TO START',
+                  const SizedBox(height: 18),
+                  const Text(
+                    'TRAP DASH ARENA',
                     style: TextStyle(
                       fontFamily: 'PressStart2P',
-                      fontSize: 18,
+                      fontSize: 26,
                       color: AppPalette.playerBlack,
                       letterSpacing: 2,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Deceptive Platformer & Score-Rush',
+                    style: TextStyle(
+                      fontFamily: 'AtkinsonHyperlegible',
+                      fontSize: 16,
+                      color: AppPalette.brownDark,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 18),
+                  const VerticalFlipTicker(
+                    width: 480,
+                    height: 36,
+                  ),
+                  const SizedBox(height: 28),
+                  AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: _pulseAnimation.value,
+                        child: child,
+                      );
+                    },
+                    child: const Text(
+                      'TAP TO START',
+                      style: TextStyle(
+                        fontFamily: 'PressStart2P',
+                        fontSize: 18,
+                        color: AppPalette.playerBlack,
+                        letterSpacing: 2,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
