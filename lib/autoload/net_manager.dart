@@ -526,13 +526,17 @@ class NetManager {
   void sendScore({required int score, required double progress}) {
     if (!isConnected.value) return;
 
-    final updatedScores = Map<String, int>.from(playerScores.value);
-    updatedScores[localPlayerId] = score;
-    playerScores.value = updatedScores;
+    if (playerScores.value[localPlayerId] != score) {
+      final updatedScores = Map<String, int>.from(playerScores.value);
+      updatedScores[localPlayerId] = score;
+      playerScores.value = updatedScores;
+    }
 
-    final updatedProg = Map<String, double>.from(playerProgress.value);
-    updatedProg[localPlayerId] = progress;
-    playerProgress.value = updatedProg;
+    if ((progress - (playerProgress.value[localPlayerId] ?? 0.0)).abs() >= 0.005) {
+      final updatedProg = Map<String, double>.from(playerProgress.value);
+      updatedProg[localPlayerId] = progress;
+      playerProgress.value = updatedProg;
+    }
 
     _transport.sendEvent({
       'type': 'score_event',

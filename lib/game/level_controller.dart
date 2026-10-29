@@ -7,6 +7,7 @@ class LevelController {
   late LevelConfig config;
 
   final ValueNotifier<double> timeLeft = ValueNotifier<double>(90.0);
+  final ValueNotifier<int> displayTimeSeconds = ValueNotifier<int>(90);
   final ValueNotifier<int> hearts = ValueNotifier<int>(5);
   final ValueNotifier<int> score = ValueNotifier<int>(0);
   final ValueNotifier<int> keysCollected = ValueNotifier<int>(0);
@@ -24,6 +25,7 @@ class LevelController {
   void startLevel(LevelConfig newConfig) {
     config = newConfig;
     timeLeft.value = config.timeLimit;
+    displayTimeSeconds.value = config.timeLimit.ceil();
     hearts.value = config.initialHearts;
     score.value = 0;
     keysCollected.value = 0;
@@ -43,6 +45,10 @@ class LevelController {
 
     if (timeLeft.value > 0) {
       timeLeft.value = max(0.0, timeLeft.value - dt);
+      final nextCeil = timeLeft.value.ceil();
+      if (nextCeil != displayTimeSeconds.value) {
+        displayTimeSeconds.value = nextCeil;
+      }
       if (timeLeft.value <= 0.0) {
         endLevel(false);
       }
@@ -161,6 +167,7 @@ class LevelController {
 
   void dispose() {
     timeLeft.dispose();
+    displayTimeSeconds.dispose();
     hearts.dispose();
     score.dispose();
     keysCollected.dispose();

@@ -50,10 +50,35 @@ void main() {
 
     test('Initial level values match config', () {
       expect(controller.timeLeft.value, equals(90.0));
+      expect(controller.displayTimeSeconds.value, equals(90));
       expect(controller.hearts.value, equals(5));
       expect(controller.score.value, equals(0));
       expect(controller.isGameOver.value, isFalse);
       expect(controller.isLevelCleared.value, isFalse);
+    });
+
+    test('displayTimeSeconds throttles notifications to integer ceiling changes only', () {
+      int notifications = 0;
+      controller.displayTimeSeconds.addListener(() {
+        notifications++;
+      });
+
+      expect(controller.displayTimeSeconds.value, equals(90));
+
+      // 50 ticks of 0.016s = 0.80s elapsed (timeLeft drops from 90.0 to 89.2)
+      // ceil(89.2) is still 90, so displayTimeSeconds MUST NOT notify!
+      for (int i = 0; i < 50; i++) {
+        controller.update(0.016);
+      }
+      expect(controller.timeLeft.value, closeTo(89.2, 0.001));
+      expect(controller.displayTimeSeconds.value, equals(90));
+      expect(notifications, equals(0));
+
+      // Advance past the 89.0 boundary (another 0.3s -> timeLeft = 88.9, ceil = 89)
+      controller.update(0.3);
+      expect(controller.timeLeft.value, closeTo(88.9, 0.001));
+      expect(controller.displayTimeSeconds.value, equals(89));
+      expect(notifications, equals(1));
     });
 
     test('Triggering checkpoint awards 100 points once', () {
