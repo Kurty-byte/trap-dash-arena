@@ -167,12 +167,12 @@ class _HazardPainter extends CustomPainter {
     if (size.width <= 0 || size.height <= 0) return;
 
     final strokePaint = Paint()
-      ..color = AppPalette.brownSolid.withOpacity(0.12)
+      ..color = AppPalette.brownSolid.withValues(alpha: 0.12)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
 
     final fillPaint = Paint()
-      ..color = AppPalette.brownSolid.withOpacity(0.04)
+      ..color = AppPalette.brownSolid.withValues(alpha: 0.04)
       ..style = PaintingStyle.fill;
 
     for (final p in particles) {

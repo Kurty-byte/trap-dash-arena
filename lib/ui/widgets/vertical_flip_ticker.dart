@@ -93,7 +93,7 @@ class _VerticalFlipTickerState extends State<VerticalFlipTicker> {
       height: widget.height,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: AppPalette.cardYellow.withOpacity(0.65),
+        color: AppPalette.cardYellow.withValues(alpha: 0.65),
         border: Border.all(color: AppPalette.brownSolid, width: 1.5),
         borderRadius: BorderRadius.circular(4),
       ),
