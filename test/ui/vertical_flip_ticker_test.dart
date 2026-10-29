@@ -49,4 +49,22 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('VerticalFlipTicker scales down long text without overflow',
+      (WidgetTester tester) async {
+    const longMessage = 'VERY LONG RETRO TIP STATEMENT THAT MUST FIT COMPLETELY';
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: VerticalFlipTicker(
+            messages: [longMessage],
+            width: 200,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text(longMessage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

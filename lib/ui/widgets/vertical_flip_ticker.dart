@@ -19,13 +19,13 @@ class VerticalFlipTicker extends StatefulWidget {
   });
 
   static const List<String> defaultMessages = [
-    'TIP: CRACKED TILES CRUMBLE IN 0.3 SECONDS',
+    'TIP: CRACKED TILES CRUMBLE IN 0.3S',
     'WARNING: SAW BLADES DO NOT NEGOTIATE',
-    'PRO TIP: THAT EXIT PORTAL MIGHT BE A TRAP',
-    'HINT: CHECKPOINTS RESTORE YOUR DIGNITY',
-    'FACT: SOME CEILINGS HAVE GRAVITY ISSUES',
+    'PRO TIP: THAT EXIT MAY BE A TRAP',
+    'HINT: CHECKPOINTS RESTORE DIGNITY',
+    'FACT: SOME CEILINGS DROP ON YOU',
     'NOTICE: PROXIMITY SPIKES SMELL FEAR',
-    'RAGE ADVISORY: THROWING PHONE VOIDS WARRANTY',
+    'ADVISORY: DONT THROW YOUR PHONE',
   ];
 
   @override
@@ -124,13 +124,15 @@ class _VerticalFlipTickerState extends State<VerticalFlipTicker> {
             ),
           );
         },
-        child: Text(
-          currentText,
+        child: FittedBox(
           key: ValueKey<int>(_currentIndex),
-          style: style,
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          fit: BoxFit.scaleDown,
+          child: Text(
+            currentText,
+            style: style,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+          ),
         ),
       ),
     );

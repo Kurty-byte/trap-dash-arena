@@ -79,7 +79,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                             ),
                             const SizedBox(height: 14),
                             const VerticalFlipTicker(
-                              width: 280,
+                              width: 300,
                               height: 34,
                             ),
                           ],
