@@ -6,6 +6,7 @@ import 'package:trap_dash_arena/autoload/game_state.dart';
 import 'package:trap_dash_arena/autoload/net_manager.dart';
 import 'package:trap_dash_arena/autoload/palette.dart';
 import 'package:trap_dash_arena/ui/game_screen.dart';
+import 'package:trap_dash_arena/ui/widgets/arcade_dialog.dart';
 import 'package:trap_dash_arena/ui/widgets/arcade_page_route.dart';
 import 'package:trap_dash_arena/ui/widgets/square_back_button.dart';
 
@@ -360,11 +361,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   tooltip: 'Copy IP',
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: _hostIp));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Host IP copied to clipboard!'),
-                        duration: Duration(seconds: 1),
-                      ),
+                    showArcadeToast(
+                      context,
+                      message: 'Host IP copied to clipboard!',
+                      icon: Icons.copy_sharp,
                     );
                   },
                 ),
