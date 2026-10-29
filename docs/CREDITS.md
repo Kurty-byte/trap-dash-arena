@@ -4,13 +4,14 @@
 
 ## 1. Graphics & Sprites
 * **Level Devil Inspired Minimalist Monotone Aesthetics:** Authentic monotone silhouette and obstacle sprites located in `assets/game/` (player runner, arch exit door, stepped tooth obstacles, rotating sawblades, compression springs, diamond coins, buttons, and bombs).
+* **HUD Icon Sprites (`assets/game/hud.png`):** Created by Thomas / Mewily (mewily.itch.io).
 * **Kenney Pixel Platformer:** Created by Kenney (kenney.nl) — CC0 1.0 Universal Public Domain.
 * **Custom Sprites:** Created in LibreSprite (GPLv2 / MIT compatible).
 
 ## 2. Audio & Sound Effects
 * **Sound Effects (`jump.wav`, `trap_trigger.wav`, `hurt.wav`, `win.wav`, `unlock.wav`):**
   Generated using jsfxr (CC0 1.0 Universal).
-* **Background Music (`bgm.ogg`):**
+* **Background Music (`bgm.mp3`):**
   Retro 8-bit / chiptune theme sourced from OpenGameArt.org (CC-BY 3.0 / CC0).
 
 ## 3. Typography
