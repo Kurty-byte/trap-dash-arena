@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
+import 'package:trap_dash_arena/game/actors/player_shard_effect.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
 
 class Player extends PositionComponent
@@ -15,18 +16,35 @@ class Player extends PositionComponent
   static const double coyoteDuration = 0.10;
   static const double jumpBufferDuration = 0.10;
 
+  static const double disintegrateDuration = 0.40;
+  static const double reintegrateDuration = 0.38;
+
   final Vector2 velocity = Vector2.zero();
   bool isOnGround = false;
   bool isEnteringDoor = false;
+
+  bool isDisintegrating = false;
+  bool isAwaitingRespawn = false;
+  bool isReintegrating = false;
+  bool isDead = false;
+
+  bool get isInDeathCycle =>
+      isDisintegrating || isAwaitingRespawn || isReintegrating || isDead;
 
   double _doorAnimTimer = 0.0;
   static const double doorAnimDuration = 0.45;
   VoidCallback? _onDoorEnterComplete;
   Vector2 _doorTargetPos = Vector2.zero();
 
+  double _deathCycleTimer = 0.0;
+  List<ShardTrajectory>? _lastDeathBurst;
+  PlayerShardEffect? _activeShardEffect;
+
   double _coyoteTimer = 0.0;
   double _jumpBufferTimer = 0.0;
+  bool get isJumpBuffered => _jumpBufferTimer > 0;
   int _horizontalDirection = 0; // -1: left, 0: idle, 1: right
+  int get horizontalDirection => _horizontalDirection;
   bool _facingLeft = false;
   bool _isInvulnerable = true;
   double _invulnerableTimer = 0.5;
@@ -55,15 +73,27 @@ class Player extends PositionComponent
     await super.onLoad();
 
     try {
-      final playerImage = await game.images.load('game/player.png');
-      _sprites = List.generate(
-        5,
-        (i) => Sprite(
-          playerImage,
-          srcPosition: Vector2(i * 40.0, 0),
-          srcSize: Vector2(40, 64),
-        ),
-      );
+      final cachedImg = game.tryGetCachedImage('game/player.png');
+      if (cachedImg != null) {
+        _sprites = List.generate(
+          5,
+          (i) => Sprite(
+            cachedImg,
+            srcPosition: Vector2(i * 40.0, 0),
+            srcSize: Vector2(40, 64),
+          ),
+        );
+      } else {
+        final playerImage = await game.images.load('game/player.png');
+        _sprites = List.generate(
+          5,
+          (i) => Sprite(
+            playerImage,
+            srcPosition: Vector2(i * 40.0, 0),
+            srcSize: Vector2(40, 64),
+          ),
+        );
+      }
     } catch (_) {
       // Fallback for headless tests
     }
@@ -88,6 +118,13 @@ class Player extends PositionComponent
 
   void jump() {
     if (isEnteringDoor) return;
+    if (isReintegrating) {
+      if (_deathCycleTimer <= jumpBufferDuration) {
+        _jumpBufferTimer = jumpBufferDuration;
+      }
+      return;
+    }
+    if (isDisintegrating || isAwaitingRespawn || isDead) return;
     _jumpBufferTimer = jumpBufferDuration;
   }
 
@@ -99,7 +136,7 @@ class Player extends PositionComponent
   }
 
   void enterDoor(Vector2 doorPosition, {required VoidCallback onComplete}) {
-    if (isEnteringDoor) return;
+    if (isEnteringDoor || isInDeathCycle) return;
     isEnteringDoor = true;
     _doorAnimTimer = doorAnimDuration;
     _onDoorEnterComplete = onComplete;
@@ -124,6 +161,58 @@ class Player extends PositionComponent
         _onDoorEnterComplete = null;
         callback?.call();
       }
+      return;
+    }
+
+    if (isDisintegrating) {
+      _deathCycleTimer -= dt;
+      if (_deathCycleTimer <= 0) {
+        isDisintegrating = false;
+        final effect = _activeShardEffect;
+        _activeShardEffect = null;
+        if (effect != null) {
+          Future.microtask(() {
+            effect.removeFromParent();
+          });
+        }
+
+        if (game.controller.isGameOver.value) {
+          isDead = true;
+        } else {
+          isAwaitingRespawn = true;
+          game.onPlayerReadyToRespawn();
+        }
+      }
+      return;
+    }
+
+    if (isAwaitingRespawn) {
+      if (game.controller.isGameOver.value) {
+        isAwaitingRespawn = false;
+        isDead = true;
+      }
+      return;
+    }
+
+    if (isReintegrating) {
+      _deathCycleTimer -= dt;
+      if (_deathCycleTimer <= 0) {
+        isReintegrating = false;
+        final effect = _activeShardEffect;
+        _activeShardEffect = null;
+        if (effect != null) {
+          Future.microtask(() {
+            effect.removeFromParent();
+          });
+        }
+        hitbox.collisionType = CollisionType.active;
+        _isInvulnerable = true;
+        _invulnerableTimer = 0.5;
+      }
+      return;
+    }
+
+    if (isDead) {
       return;
     }
 
@@ -177,38 +266,101 @@ class Player extends PositionComponent
 
     // Pit fall check (fell off bottom of stage)
     if (position.y > 732) {
-      takeDamage();
-      respawnAt(game.lastCheckpointPosition);
+      takeDamage(ignoreInvulnerability: true, isPitFall: true);
     } else if (velocity.y != 0) {
       // In air unless confirmed by solid collision
       isOnGround = false;
     }
   }
 
-  void takeDamage() {
-    if (_isInvulnerable || isEnteringDoor) return;
+  void takeDamage({bool ignoreInvulnerability = false, bool isPitFall = false}) {
+    if (isEnteringDoor || isInDeathCycle || game.controller.isGameOver.value) {
+      return;
+    }
+    if (_isInvulnerable && !ignoreInvulnerability) return;
 
-    _isInvulnerable = true;
-    _invulnerableTimer = 1.0;
+    isDisintegrating = true;
+    isAwaitingRespawn = false;
+    isReintegrating = false;
+    isDead = false;
+    _deathCycleTimer = disintegrateDuration;
+    hitbox.collisionType = CollisionType.inactive;
+    velocity.setZero();
+    _coyoteTimer = 0.0;
+    _jumpBufferTimer = 0.0;
+
+    final burstPos = isPitFall
+        ? Vector2(position.x, min(position.y, 716.0))
+        : position.clone();
+
+    _lastDeathBurst = ShardTrajectory.generate(
+      isPitFall: isPitFall,
+      facingLeft: _facingLeft,
+    );
+
+    _activeShardEffect?.removeFromParent();
+    _activeShardEffect = PlayerShardEffect(
+      position: burstPos,
+      shards: _lastDeathBurst!,
+      mode: ShardEffectMode.disintegrate,
+      duration: disintegrateDuration,
+    );
+    game.world.add(_activeShardEffect!);
+
     game.onPlayerHurt();
   }
 
-  void respawnAt(Vector2 newPosition) {
+  void respawnAt(Vector2 newPosition, {bool playReintegration = false}) {
     isEnteringDoor = false;
     _doorAnimTimer = 0.0;
     _onDoorEnterComplete = null;
+
+    final oldEffect = _activeShardEffect;
+    _activeShardEffect = null;
+    if (oldEffect != null) {
+      Future.microtask(() {
+        oldEffect.removeFromParent();
+      });
+    }
+
     position = newPosition.clone();
     velocity.setZero();
-    _horizontalDirection = 0;
     _coyoteTimer = 0.0;
     _jumpBufferTimer = 0.0;
     isOnGround = false;
-    _isInvulnerable = true;
-    _invulnerableTimer = 1.2;
+    isDisintegrating = false;
+    isDead = false;
+    _currentFrame = 0;
+    _facingLeft = false;
+
+    if (playReintegration) {
+      isAwaitingRespawn = false;
+      isReintegrating = true;
+      _deathCycleTimer = reintegrateDuration;
+      hitbox.collisionType = CollisionType.inactive;
+
+      // Reintegration uses identical trajectories in reverse onto checkpoint
+      final shards = _lastDeathBurst ?? ShardTrajectory.generate();
+      _activeShardEffect = PlayerShardEffect(
+        position: newPosition.clone(),
+        shards: shards,
+        mode: ShardEffectMode.reintegrate,
+        duration: reintegrateDuration,
+      );
+      game.world.add(_activeShardEffect!);
+    } else {
+      isAwaitingRespawn = false;
+      isReintegrating = false;
+      hitbox.collisionType = CollisionType.active;
+      _isInvulnerable = true;
+      _invulnerableTimer = 0.5;
+    }
   }
 
   @override
   void render(Canvas canvas) {
+    if (isInDeathCycle) return;
+
     super.render(canvas);
 
     canvas.save();
@@ -231,7 +383,7 @@ class Player extends PositionComponent
 
     final int alpha = isEnteringDoor
         ? (((_doorAnimTimer / doorAnimDuration)) * 255).clamp(0, 255).toInt()
-        : (_isInvulnerable ? 102 : 255);
+        : 255;
 
     final paint = Paint()..color = Color.fromARGB(alpha, 0, 0, 0);
 
