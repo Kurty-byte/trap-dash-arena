@@ -54,9 +54,54 @@ void main() {
       findsAtLeastNWidgets(1),
     );
 
+    // Verify platform progression squares (Level 1 has 3 platforms)
+    expect(find.byKey(const Key('hud_platform_square_1')), findsOneWidget);
+    expect(find.byKey(const Key('hud_platform_square_2')), findsOneWidget);
+    expect(find.byKey(const Key('hud_platform_square_3')), findsOneWidget);
+    expect(find.byKey(const Key('hud_platform_square_4')), findsNothing);
+
     // Tapping pause button pauses game
     await tester.tap(find.byKey(const Key('hud_pause_button')));
     expect(game.paused, isTrue);
+  });
+
+  testWidgets('HudOverlay platform progress squares reflect active platform and level cleared state',
+      (tester) async {
+    final game = TrapDashGame(initialLevelNumber: 1);
+    game.controller.startLevel(LevelConfig.get(1));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1280,
+            height: 720,
+            child: Stack(
+              children: [
+                HudOverlay(game: game),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(game.controller.currentPlatform.value, equals(1));
+    expect(find.byKey(const Key('hud_platform_square_1')), findsOneWidget);
+    expect(find.byKey(const Key('hud_platform_square_2')), findsOneWidget);
+    expect(find.byKey(const Key('hud_platform_square_3')), findsOneWidget);
+
+    // Transition to Platform 2
+    game.controller.currentPlatform.value = 2;
+    await tester.pump();
+
+    // Transition to Platform 3
+    game.controller.currentPlatform.value = 3;
+    await tester.pump();
+
+    // Level cleared
+    game.controller.isLevelCleared.value = true;
+    await tester.pump();
   });
 
   testWidgets('TouchControlsOverlay renders wireframe pads with >= 120px hitboxes and dispatches player actions',

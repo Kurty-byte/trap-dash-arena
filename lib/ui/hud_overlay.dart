@@ -124,29 +124,42 @@ class HudOverlay extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // 5 level-progress indicator squares (matching sample.jpg top header)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: List.generate(5, (i) {
-                                final isCurrent = i + 1 == game.currentLevelNumber;
-                                final isPast = i + 1 < game.currentLevelNumber;
-                                return Container(
-                                  width: 8,
-                                  height: 8,
-                                  margin: const EdgeInsets.symmetric(horizontal: 2.5),
-                                  decoration: BoxDecoration(
-                                    color: isCurrent
-                                        ? AppPalette.playerBlack
-                                        : (isPast ? AppPalette.yellowBackground : Colors.transparent),
-                                    border: Border.all(
-                                      color: isCurrent
-                                          ? AppPalette.playerBlack
-                                          : AppPalette.yellowBackground,
-                                      width: 1.2,
-                                    ),
-                                  ),
+                            // Platform progression indicator squares
+                            ValueListenableBuilder<bool>(
+                              valueListenable: controller.isLevelCleared,
+                              builder: (context, isCleared, _) {
+                                return ValueListenableBuilder<int>(
+                                  valueListenable: controller.currentPlatform,
+                                  builder: (context, currentPlatformVal, _) {
+                                    final totalPlatforms = controller.config.roomCount;
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: List.generate(totalPlatforms, (i) {
+                                        final platformNum = i + 1;
+                                        final isPast = isCleared || platformNum < currentPlatformVal;
+                                        final isCurrent = !isCleared && platformNum == currentPlatformVal;
+                                        return Container(
+                                          key: Key('hud_platform_square_$platformNum'),
+                                          width: 8,
+                                          height: 8,
+                                          margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                                          decoration: BoxDecoration(
+                                            color: isCurrent
+                                                ? AppPalette.playerBlack
+                                                : (isPast ? AppPalette.yellowBackground : Colors.transparent),
+                                            border: Border.all(
+                                              color: isCurrent
+                                                  ? AppPalette.playerBlack
+                                                  : AppPalette.yellowBackground,
+                                              width: 1.2,
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    );
+                                  },
                                 );
-                              }),
+                              },
                             ),
                             const SizedBox(height: 3),
 
