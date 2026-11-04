@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:trap_dash_arena/autoload/audio_manager.dart';
@@ -17,11 +18,14 @@ void main() async {
   // Immersive sticky fullscreen mode for mobile arcade gameplay
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-  // Initialize persistence and audio autoload singletons
+  // Initialize persistence singleton
   await GameState.instance.init();
-  await AudioManager.instance.init();
 
+  // Mount UI immediately so TitleScreen renders without waiting on native audio drivers
   runApp(const TrapDashApp());
+
+  // Initialize audio asynchronously in background
+  unawaited(AudioManager.instance.init());
 }
 
 class TrapDashApp extends StatelessWidget {

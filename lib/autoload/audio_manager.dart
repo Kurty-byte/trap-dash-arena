@@ -21,7 +21,12 @@ class FlameAudioBackend implements AudioBackend {
     _initialized = true;
 
     try {
-      await FlameAudio.bgm.initialize();
+      await FlameAudio.bgm.initialize().timeout(const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint('FlameAudioBackend: bgm.initialize error: $e');
+    }
+
+    try {
       await FlameAudio.audioCache.loadAll([
         'bgm.mp3',
         'hurt.wav',
@@ -29,30 +34,30 @@ class FlameAudioBackend implements AudioBackend {
         'trap_trigger.wav',
         'unlock.wav',
         'win.wav',
-      ]);
-
-      final poolConfigs = {
-        'jump.wav': (min: 2, max: 4),
-        'trap_trigger.wav': (min: 2, max: 4),
-        'hurt.wav': (min: 1, max: 2),
-        'unlock.wav': (min: 1, max: 3),
-        'win.wav': (min: 1, max: 2),
-      };
-
-      for (final entry in poolConfigs.entries) {
-        try {
-          final pool = await FlameAudio.createPool(
-            entry.key,
-            minPlayers: entry.value.min,
-            maxPlayers: entry.value.max,
-          );
-          _sfxPools[entry.key] = pool;
-        } catch (e) {
-          debugPrint('FlameAudioBackend: failed to create pool for ${entry.key}: $e');
-        }
-      }
+      ]).timeout(const Duration(seconds: 3));
     } catch (e) {
-      debugPrint('FlameAudioBackend.init error: $e');
+      debugPrint('FlameAudioBackend: audioCache.loadAll error: $e');
+    }
+
+    final poolConfigs = {
+      'jump.wav': (min: 2, max: 4),
+      'trap_trigger.wav': (min: 2, max: 4),
+      'hurt.wav': (min: 1, max: 2),
+      'unlock.wav': (min: 1, max: 3),
+      'win.wav': (min: 1, max: 2),
+    };
+
+    for (final entry in poolConfigs.entries) {
+      try {
+        final pool = await FlameAudio.createPool(
+          entry.key,
+          minPlayers: entry.value.min,
+          maxPlayers: entry.value.max,
+        ).timeout(const Duration(seconds: 2));
+        _sfxPools[entry.key] = pool;
+      } catch (e) {
+        debugPrint('FlameAudioBackend: failed to create pool for ${entry.key}: $e');
+      }
     }
   }
 
