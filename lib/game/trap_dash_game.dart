@@ -13,7 +13,9 @@ import 'package:trap_dash_arena/autoload/palette.dart';
 import 'package:trap_dash_arena/game/actors/disappearing_platform.dart';
 import 'package:trap_dash_arena/game/actors/fake_floor.dart';
 import 'package:trap_dash_arena/game/actors/falling_block.dart';
+import 'package:trap_dash_arena/game/actors/moving_gap_floor.dart';
 import 'package:trap_dash_arena/game/actors/player.dart';
+import 'package:trap_dash_arena/game/actors/sudden_gap.dart';
 import 'package:trap_dash_arena/game/actors/trap_spike.dart';
 import 'package:trap_dash_arena/game/chamber_loader.dart';
 import 'package:trap_dash_arena/game/level_config.dart';
@@ -32,6 +34,16 @@ class TrapDashGame extends FlameGame
   SimpleAI? paceBot;
   Vector2 startSpawnPosition = Vector2(148, 552);
   Vector2 lastCheckpointPosition = Vector2(148, 552);
+
+  int _roomCount = 1;
+  int get roomCount => _roomCount;
+  final Vector2 _cameraFocus = Vector2(640, 360);
+  Vector2 get cameraFocus => _cameraFocus;
+
+  double targetRoomCenterXFor(double worldX) {
+    final roomIndex = (worldX / 1280.0).floor().clamp(0, _roomCount - 1);
+    return roomIndex * 1280.0 + 640.0;
+  }
 
   double _trauma = 0.0;
   final Random _random = Random();
@@ -104,17 +116,22 @@ class TrapDashGame extends FlameGame
     world.removeAll(world.children);
 
     final config = LevelConfig.get(levelNumber);
+    _roomCount = config.roomCount;
     controller.startLevel(config);
 
-    // Fixed single-screen camera framing
+    // Camera initial framing
     camera.stop();
-    camera.viewfinder.position = viewportCenter.clone();
+    _cameraFocus.setValues(640, 360);
+    camera.viewfinder.position.setFrom(_cameraFocus);
 
     // Load enclosed chamber geometry and objects
     final chamberResult = await ChamberLoader.loadIntoWorld(this, config);
     startSpawnPosition = chamberResult.spawnPosition.clone();
     lastCheckpointPosition = startSpawnPosition.clone();
     _exitX = chamberResult.exitX;
+
+    _cameraFocus.setValues(targetRoomCenterXFor(startSpawnPosition.x), 360.0);
+    camera.viewfinder.position.setFrom(_cameraFocus);
 
     // Spawn player inside chamber
     player = Player(position: startSpawnPosition);
@@ -177,8 +194,18 @@ class TrapDashGame extends FlameGame
       } else if (child is DisappearingPlatform) {
         child.isPlatformSolid = true;
         child.hitbox.collisionType = CollisionType.passive;
+      } else if (child is SuddenGap) {
+        child.resetToSolid();
+      } else if (child is MovingGapFloor) {
+        child.resetToInitial();
       }
     }
+
+    _cameraFocus.setValues(targetRoomCenterXFor(lastCheckpointPosition.x), 360.0);
+    camera.viewfinder.position = _cameraFocus.clone();
+
+    final respawnPlatform = (lastCheckpointPosition.x / 1280.0).floor().clamp(0, _roomCount - 1) + 1;
+    controller.currentPlatform.value = respawnPlatform;
 
     player.respawnAt(
       lastCheckpointPosition,
@@ -222,6 +249,12 @@ class TrapDashGame extends FlameGame
       controller.progress.value = progressVal;
     }
 
+    // Update active platform progression index (1..roomCount)
+    final activePlatformIndex = (player.position.x / 1280.0).floor().clamp(0, _roomCount - 1) + 1;
+    if (controller.currentPlatform.value != activePlatformIndex) {
+      controller.currentPlatform.value = activePlatformIndex;
+    }
+
     // Report network multiplayer score and progress
     if (GameState.instance.mode == 'online' && NetManager.instance.isConnected.value) {
       _netUpdateTimer += dt;
@@ -259,20 +292,32 @@ class TrapDashGame extends FlameGame
       }
     }
 
-    // Screen shake around fixed viewport center (zero cumulative drift, idle guard)
+    // Room-by-room smooth camera panning
+    if (!player.isInDeathCycle) {
+      final targetCenterX = targetRoomCenterXFor(player.position.x);
+      final t = 1.0 - exp(-14.0 * dt);
+      _cameraFocus.x += (targetCenterX - _cameraFocus.x) * t;
+      if ((targetCenterX - _cameraFocus.x).abs() < 0.5) {
+        _cameraFocus.x = targetCenterX;
+      }
+    }
+
+    // Screen shake around camera focus (zero cumulative drift, idle guard)
     if (_trauma > 0) {
       _trauma = max(0.0, _trauma - dt * 2.0);
       if (_trauma > 0) {
         final shake = _trauma * _trauma * 14.0;
         final offsetX = (_random.nextDouble() * 2 - 1) * shake;
         final offsetY = (_random.nextDouble() * 2 - 1) * shake;
-        camera.viewfinder.position.setValues(
-          viewportCenter.x + offsetX,
-          viewportCenter.y + offsetY,
+        camera.viewfinder.position = Vector2(
+          _cameraFocus.x + offsetX,
+          _cameraFocus.y + offsetY,
         );
       } else {
-        camera.viewfinder.position.setFrom(viewportCenter);
+        camera.viewfinder.position = _cameraFocus.clone();
       }
+    } else {
+      camera.viewfinder.position = _cameraFocus.clone();
     }
   }
 

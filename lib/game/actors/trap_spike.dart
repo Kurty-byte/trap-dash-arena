@@ -7,22 +7,43 @@ import 'package:trap_dash_arena/autoload/palette.dart';
 import 'package:trap_dash_arena/game/actors/player.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
 
+enum SpikeBehavior {
+  stationary,
+  proximityPopUp,
+  slideRightOnJump,
+  riseOnProximity,
+  doubleSlideTrap,
+}
+
 class TrapSpike extends PositionComponent
     with CollisionCallbacks, HasGameReference<TrapDashGame> {
   final String trapId;
   final bool isStatic;
+  final SpikeBehavior behavior;
+  final double triggerDistance;
+  final double jitterDuration;
+  final bool hideCompletelyWhenIdle;
+  final double slideRightDistance;
+  final double slideLeftDistance;
+  final double slideSpeed;
+  final double returnSlideSpeed;
+  final double riseHeight;
+  final double riseSpeed;
 
   bool isRevealed = false;
   bool isTriggered = false;
   bool isExtended = false;
 
+  late final Vector2 _initialPosition;
+  int _trapPhase = 0;
+  double _phaseTimer = 0.0;
   double _jitterTimer = 0.30;
   double _survivalTimer = 0.50;
   bool _baitAwarded = false;
   double _jitterOffsetX = 0.0;
   Sprite? _obstacleSprite;
 
-  late final RectangleHitbox hitbox;
+  final RectangleHitbox hitbox;
   late final Rect _boundsRect = Rect.fromLTWH(0, 0, size.x, size.y);
   late final Rect _warningRect = Rect.fromLTWH(0, size.y - 4, size.x, 4);
   final Vector2 _renderPos = Vector2.zero();
@@ -38,25 +59,39 @@ class TrapSpike extends PositionComponent
     required this.trapId,
     required Vector2 position,
     this.isStatic = false,
-  }) : super(
+    SpikeBehavior? behavior,
+    this.triggerDistance = 48.0,
+    this.jitterDuration = 0.30,
+    this.hideCompletelyWhenIdle = false,
+    this.slideRightDistance = 96.0,
+    this.slideLeftDistance = 80.0,
+    this.slideSpeed = 460.0,
+    this.returnSlideSpeed = 480.0,
+    this.riseHeight = 88.0,
+    this.riseSpeed = 680.0,
+  })  : behavior = behavior ??
+            (isStatic ? SpikeBehavior.stationary : SpikeBehavior.proximityPopUp),
+        hitbox = RectangleHitbox(
+          size: Vector2(32, 24),
+          position: Vector2(2, 2),
+          collisionType: CollisionType.passive,
+        ),
+        super(
           position: position,
           size: Vector2(36, 26),
           anchor: Anchor.bottomCenter,
         ) {
-    if (isStatic) {
+    _initialPosition = position.clone();
+    _jitterTimer = jitterDuration;
+    if (this.behavior != SpikeBehavior.proximityPopUp) {
       isExtended = true;
     }
+    add(hitbox);
   }
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    hitbox = RectangleHitbox(
-      size: Vector2(size.x - 4, size.y - 2),
-      position: Vector2(2, 2),
-      collisionType: CollisionType.passive,
-    );
-    add(hitbox);
 
     try {
       final cached = game.tryGetCachedSprite('game/obstacle.png');
@@ -73,32 +108,135 @@ class TrapSpike extends PositionComponent
   @override
   void update(double dt) {
     super.update(dt);
+    final player = game.player;
 
-    if (!isStatic && !isTriggered && !isExtended) {
-      // Proximity check (48 px radius from player, 48^2 = 2304)
-      final player = game.player;
-      if (!player.isInDeathCycle) {
-        if (player.position.distanceToSquared(position) <= 2304.0) {
-          triggerJitter();
+    switch (behavior) {
+      case SpikeBehavior.stationary:
+        break;
+
+      case SpikeBehavior.proximityPopUp:
+        if (!isTriggered && !isExtended) {
+          if (!player.isInDeathCycle) {
+            if (player.position.distanceToSquared(position) <=
+                triggerDistance * triggerDistance) {
+              triggerJitter();
+            }
+          }
         }
-      }
-    }
 
-    if (isTriggered && !isExtended) {
-      _jitterTimer -= dt;
-      _jitterOffsetX = (sin(_jitterTimer * 50) * 2.0);
+        if (isTriggered && !isExtended) {
+          _jitterTimer -= dt;
+          _jitterOffsetX = (sin(_jitterTimer * 50) * 2.0);
 
-      if (_jitterTimer <= 0) {
-        thrustUp();
-      }
-    }
+          if (_jitterTimer <= 0) {
+            thrustUp();
+          }
+        }
 
-    if (isTriggered && !_baitAwarded) {
-      _survivalTimer -= dt;
-      if (_survivalTimer <= 0) {
-        _baitAwarded = true;
-        game.controller.onTrapBait(trapId);
-      }
+        if (isTriggered && !_baitAwarded) {
+          _survivalTimer -= dt;
+          if (_survivalTimer <= 0) {
+            _baitAwarded = true;
+            game.controller.onTrapBait(trapId);
+          }
+        }
+        break;
+
+      case SpikeBehavior.slideRightOnJump:
+        if (!isTriggered) {
+          if (!player.isInDeathCycle &&
+              !player.isOnGround &&
+              player.position.x >= _initialPosition.x - 56.0 &&
+              player.position.x <= _initialPosition.x + 36.0 &&
+              player.position.y <= _initialPosition.y - 16.0) {
+            isTriggered = true;
+            game.audio.playSfx('trap_trigger.wav');
+          }
+        } else {
+          final targetX = _initialPosition.x + slideRightDistance;
+          if (position.x < targetX) {
+            position.x = min(targetX, position.x + slideSpeed * dt);
+          }
+
+          if (!_baitAwarded && position.x >= targetX) {
+            _survivalTimer -= dt;
+            if (_survivalTimer <= 0) {
+              _baitAwarded = true;
+              game.controller.onTrapBait(trapId);
+            }
+          }
+        }
+        break;
+
+      case SpikeBehavior.riseOnProximity:
+        if (!isTriggered) {
+          if (!player.isInDeathCycle &&
+              (player.position.x - _initialPosition.x).abs() <= triggerDistance) {
+            isTriggered = true;
+            game.audio.playSfx('trap_trigger.wav');
+          }
+        } else {
+          final targetY = _initialPosition.y - riseHeight;
+          if (position.y > targetY) {
+            position.y = max(targetY, position.y - riseSpeed * dt);
+          }
+
+          if (!_baitAwarded && position.y <= targetY) {
+            _survivalTimer -= dt;
+            if (_survivalTimer <= 0) {
+              _baitAwarded = true;
+              game.controller.onTrapBait(trapId);
+            }
+          }
+        }
+        break;
+
+      case SpikeBehavior.doubleSlideTrap:
+        if (_trapPhase == 0) {
+          if (!player.isInDeathCycle &&
+              (player.position.x - _initialPosition.x).abs() <= triggerDistance) {
+            isTriggered = true;
+            _trapPhase = 1;
+            game.audio.playSfx('trap_trigger.wav');
+          }
+        } else if (_trapPhase == 1) {
+          final targetRightX = _initialPosition.x + slideRightDistance;
+          if (position.x < targetRightX) {
+            position.x = min(targetRightX, position.x + slideSpeed * dt);
+          }
+          if (position.x >= targetRightX) {
+            _trapPhase = 2;
+            _phaseTimer = 0.0;
+          }
+        } else if (_trapPhase == 2) {
+          // Waiting for player to land on the left
+          if (!player.isInDeathCycle &&
+              player.isOnGround &&
+              player.position.x < position.x - 24.0) {
+            _phaseTimer += dt;
+            if (_phaseTimer >= 0.06) {
+              _trapPhase = 3;
+              game.audio.playSfx('trap_trigger.wav');
+            }
+          }
+        } else if (_trapPhase == 3) {
+          final targetLeftX = _initialPosition.x - slideLeftDistance;
+          if (position.x > targetLeftX) {
+            position.x = max(targetLeftX, position.x - returnSlideSpeed * dt);
+          }
+          if (position.x <= targetLeftX) {
+            _trapPhase = 4;
+          }
+        } else if (_trapPhase == 4) {
+          if (!_baitAwarded) {
+            _survivalTimer -= dt;
+            if (_survivalTimer <= 0) {
+              _baitAwarded = true;
+              game.controller.onTrapBait(trapId);
+            }
+          }
+        }
+        break;
     }
   }
 
@@ -113,13 +251,23 @@ class TrapSpike extends PositionComponent
   }
 
   void retract() {
-    if (!isStatic) {
+    if (behavior != SpikeBehavior.stationary) {
+      if (isTriggered) {
+        isRevealed = true;
+      }
       isTriggered = false;
-      isExtended = false;
-      isRevealed = true; // Retains memory after death!
-      _jitterTimer = 0.30;
+      position.setFrom(_initialPosition);
+      _jitterTimer = jitterDuration;
       _survivalTimer = 0.50;
       _jitterOffsetX = 0.0;
+      _trapPhase = 0;
+      _phaseTimer = 0.0;
+      _baitAwarded = false;
+      if (behavior == SpikeBehavior.proximityPopUp) {
+        isExtended = false;
+      } else {
+        isExtended = true;
+      }
     }
   }
 
@@ -137,6 +285,14 @@ class TrapSpike extends PositionComponent
 
   @override
   void render(Canvas canvas) {
+    if (hideCompletelyWhenIdle &&
+        !isTriggered &&
+        !isExtended &&
+        !isRevealed &&
+        !GameState.instance.highContrastTells) {
+      return;
+    }
+
     super.render(canvas);
 
     final isHighContrast = GameState.instance.highContrastTells;

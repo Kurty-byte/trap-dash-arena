@@ -15,6 +15,7 @@ class LevelController {
   final ValueNotifier<double> suddenDeathLeft = ValueNotifier<double>(0.0);
   final ValueNotifier<bool> isGameOver = ValueNotifier<bool>(false);
   final ValueNotifier<bool> isLevelCleared = ValueNotifier<bool>(false);
+  final ValueNotifier<int> currentPlatform = ValueNotifier<int>(1);
 
   final Set<int> _visitedCheckpoints = <int>{};
   final Set<String> _baitedTraps = <String>{};
@@ -30,6 +31,7 @@ class LevelController {
     score.value = 0;
     keysCollected.value = 0;
     progress.value = 0.0;
+    currentPlatform.value = 1;
     suddenDeathLeft.value = 0.0;
     isGameOver.value = false;
     isLevelCleared.value = false;

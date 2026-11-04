@@ -9,9 +9,11 @@ import 'package:trap_dash_arena/game/actors/fake_floor.dart';
 import 'package:trap_dash_arena/game/actors/falling_block.dart';
 import 'package:trap_dash_arena/game/actors/ground_block.dart';
 import 'package:trap_dash_arena/game/actors/hint_arrow.dart';
+import 'package:trap_dash_arena/game/actors/moving_gap_floor.dart';
 import 'package:trap_dash_arena/game/actors/moving_saw.dart';
 import 'package:trap_dash_arena/game/actors/pickup_item.dart';
 import 'package:trap_dash_arena/game/actors/reverse_spring.dart';
+import 'package:trap_dash_arena/game/actors/sudden_gap.dart';
 import 'package:trap_dash_arena/game/actors/trap_spike.dart';
 import 'package:trap_dash_arena/game/level_config.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
@@ -40,7 +42,7 @@ class ChamberLoader {
     LevelConfig config,
   ) async {
     // 1. Always spawn outer solid enclosure walls (+32px bleed margin to prevent camera shake bleed)
-    _spawnPerimeterShell(game.world);
+    _spawnPerimeterShell(game.world, roomCount: config.roomCount);
 
     // In unit/widget tests, use fast programmatic chamber directly to avoid asset bundle timeouts
     if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
@@ -63,29 +65,31 @@ class ChamberLoader {
     } catch (_) {
       // In headless test environments or asset bundle fallbacks
       game.world.removeAll(game.world.children);
-      _spawnPerimeterShell(game.world);
+      _spawnPerimeterShell(game.world, roomCount: config.roomCount);
     }
 
     return _loadProgrammaticChamber(game, config.levelNumber);
   }
 
-  static void _spawnPerimeterShell(World world) {
+  static void _spawnPerimeterShell(World world, {int roomCount = 1}) {
     // Left outer wall (inner edge at x = 96)
     world.add(GroundBlock(
       position: Vector2(-32, -32),
       size: Vector2(128, 784),
     ));
 
-    // Right outer wall (inner edge at x = 1184)
+    // Right outer wall (inner edge at x = roomCount * 1280 - 96)
+    final rightWallX = roomCount * 1280.0 - 96.0;
     world.add(GroundBlock(
-      position: Vector2(1184, -32),
+      position: Vector2(rightWallX, -32),
       size: Vector2(128, 784),
     ));
 
     // Top ceiling wall (inner edge at y = 72)
+    final ceilingW = roomCount * 1280.0 + 64.0;
     world.add(GroundBlock(
       position: Vector2(-32, -32),
-      size: Vector2(1344, 104),
+      size: Vector2(ceilingW, 104),
     ));
   }
 
@@ -127,10 +131,51 @@ class ChamberLoader {
             ));
             break;
           case 'TrapSpike':
+            final behStr = obj.properties.getValue<String>('behavior');
+            SpikeBehavior? beh;
+            if (behStr != null) {
+              switch (behStr) {
+                case 'stationary':
+                  beh = SpikeBehavior.stationary;
+                  break;
+                case 'proximityPopUp':
+                  beh = SpikeBehavior.proximityPopUp;
+                  break;
+                case 'slideRightOnJump':
+                  beh = SpikeBehavior.slideRightOnJump;
+                  break;
+                case 'riseOnProximity':
+                  beh = SpikeBehavior.riseOnProximity;
+                  break;
+                case 'doubleSlideTrap':
+                  beh = SpikeBehavior.doubleSlideTrap;
+                  break;
+              }
+            }
+            final isStat = obj.properties.getValue<bool>('isStatic') ?? false;
+            final trigDist = obj.properties.getValue<double>('triggerDistance') ?? 48.0;
+            final jitDur = obj.properties.getValue<double>('jitterDuration') ?? 0.30;
+            final hideIdle = obj.properties.getValue<bool>('hideCompletelyWhenIdle') ?? false;
+            final slideRight = obj.properties.getValue<double>('slideRightDistance') ?? 96.0;
+            final slideLeft = obj.properties.getValue<double>('slideLeftDistance') ?? 80.0;
+            final slideSpd = obj.properties.getValue<double>('slideSpeed') ?? 460.0;
+            final retSlideSpd = obj.properties.getValue<double>('returnSlideSpeed') ?? 480.0;
+            final riseH = obj.properties.getValue<double>('riseHeight') ?? 88.0;
+            final riseSpd = obj.properties.getValue<double>('riseSpeed') ?? 680.0;
             game.world.add(TrapSpike(
               trapId: 's_${obj.id}',
               position: pos,
-              isStatic: false,
+              isStatic: isStat,
+              behavior: beh,
+              triggerDistance: trigDist,
+              jitterDuration: jitDur,
+              hideCompletelyWhenIdle: hideIdle,
+              slideRightDistance: slideRight,
+              slideLeftDistance: slideLeft,
+              slideSpeed: slideSpd,
+              returnSlideSpeed: retSlideSpd,
+              riseHeight: riseH,
+              riseSpeed: riseSpd,
             ));
             break;
           case 'FakeFloor':
@@ -193,6 +238,47 @@ class ChamberLoader {
           case 'HintArrow':
             game.world.add(HintArrow(position: pos));
             break;
+          case 'SuddenGap':
+            final lead = obj.properties.getValue<double>('triggerLeadPx') ?? 46.0;
+            game.world.add(SuddenGap(
+              trapId: 'sg_${obj.id}',
+              position: pos,
+              size: size,
+              triggerLeadPx: lead,
+            ));
+            break;
+          case 'MovingGapFloor':
+            final modeStr = obj.properties.getValue<String>('mode') ?? 'chase';
+            final mode = modeStr == 'hesitation'
+                ? MovingGapMode.hesitation
+                : MovingGapMode.chase;
+            final gapW = obj.properties.getValue<double>('gapWidth') ?? 88.0;
+            final triggerX = obj.properties.getValue<double>('triggerPlayerX') ?? 0.0;
+            final chaseStartX = obj.properties.getValue<double>('chaseStartPlayerX') ?? 0.0;
+            final speed = obj.properties.getValue<double>('chaseSpeed') ?? 205.0;
+            final stopX = obj.properties.getValue<double>('stopGapX') ?? 512.0;
+            final actRoomX = obj.properties.getValue<double>('activateRoomX') ?? 0.0;
+            final initGapX = obj.properties.getValue<double>('initialGapLocalX') ?? 300.0;
+            final anchorGapX = obj.properties.getValue<double>('anchorGapLocalX') ?? 420.0;
+            final proxRange = obj.properties.getValue<double>('proximityRangePx') ?? 140.0;
+            final punishSpd = obj.properties.getValue<double>('punishSpeed') ?? 950.0;
+            game.world.add(MovingGapFloor(
+              trapId: 'mgf_${obj.id}',
+              position: pos,
+              size: size,
+              mode: mode,
+              gapWidth: gapW,
+              triggerPlayerX: triggerX,
+              chaseStartPlayerX: chaseStartX,
+              chaseSpeed: speed,
+              stopGapX: stopX,
+              activateRoomX: actRoomX,
+              initialGapLocalX: initGapX,
+              anchorGapLocalX: anchorGapX,
+              proximityRangePx: proxRange,
+              punishSpeed: punishSpd,
+            ));
+            break;
           case 'ExitPortal':
             exitX = pos.x;
             final isFake = obj.properties.getValue<bool>('isFakeFirst') ?? false;
@@ -241,78 +327,180 @@ class ChamberLoader {
 
   static ChamberLoadResult _buildLevel1(TrapDashGame game) {
     final w = game.world;
-    // Overhang ceiling slab (x: 448..1184, y: 72..268, leaving 284px tunnel)
-    w.add(GroundBlock(position: Vector2(448, 72), size: Vector2(736, 196)));
 
-    // Floor 1: starting area
-    w.add(GroundBlock(position: Vector2(96, 552), size: Vector2(264, 200)));
-    w.add(HintArrow(position: Vector2(190, 500)));
-    w.add(HintArrow(position: Vector2(220, 500)));
-    w.add(TrapSpike(trapId: 's1_1', position: Vector2(268, 552), isStatic: true));
+    // Partition upper wall roofs between rooms leaving 96px high passage tunnels (y: 456..552)
+    w.add(GroundBlock(position: Vector2(1184, 72), size: Vector2(192, 384)));
+    w.add(GroundBlock(position: Vector2(2464, 72), size: Vector2(192, 384)));
 
-    // Pit 1: crumbling floor bridge
-    w.add(FakeFloor(trapId: 'f1_1', position: Vector2(376, 552), size: Vector2(64, 24)));
-    w.add(FakeFloor(trapId: 'f1_2', position: Vector2(460, 552), size: Vector2(64, 24)));
-    w.add(PickupItem(type: PickupType.coin, position: Vector2(408, 500)));
-    w.add(PickupItem(type: PickupType.coin, position: Vector2(492, 500)));
+    // Room 1 / Platform 1 (x: 96..1184) + Passage 1 (x: 1184..1376)
+    // Starting floor slab
+    w.add(GroundBlock(position: Vector2(96, 552), size: Vector2(480, 200)));
+    // Platform 1: Sudden gap
+    w.add(SuddenGap(
+      trapId: 'l1_p1_gap1',
+      position: Vector2(576, 552),
+      size: Vector2(92, 200),
+      triggerLeadPx: 46.0,
+    ));
+    // Landing floor extending into Passage 1 and up to Room 2 first gap
+    w.add(GroundBlock(position: Vector2(668, 552), size: Vector2(892, 200)));
+    // Passage 1: Checkpoint 1
+    w.add(CheckpointFlag(checkpointId: 1, position: Vector2(1312, 552)));
 
-    // Floor 2: checkpoint and trap
-    w.add(GroundBlock(position: Vector2(544, 552), size: Vector2(296, 200)));
-    w.add(CheckpointFlag(checkpointId: 1, position: Vector2(600, 552)));
-    w.add(PickupItem(type: PickupType.coin, position: Vector2(680, 500)));
-    w.add(TrapSpike(trapId: 's1_2', position: Vector2(750, 552), isStatic: false));
+    // Room 2 / Platform 2 (x: 1376..2464) + Passage 2 (x: 2464..2656)
+    // Deceptive sudden gap 2A
+    w.add(SuddenGap(
+      trapId: 'l1_p2_gap1',
+      position: Vector2(1560, 552),
+      size: Vector2(88, 200),
+      triggerLeadPx: 44.0,
+    ));
+    // Stepping island
+    w.add(GroundBlock(position: Vector2(1648, 552), size: Vector2(104, 200)));
+    // Deceptive sudden gap 2B
+    w.add(SuddenGap(
+      trapId: 'l1_p2_gap2',
+      position: Vector2(1752, 552),
+      size: Vector2(88, 200),
+      triggerLeadPx: 44.0,
+    ));
+    // Chasing gap floor
+    w.add(MovingGapFloor(
+      trapId: 'l1_p2_chase',
+      position: Vector2(1840, 552),
+      size: Vector2(624, 200),
+      mode: MovingGapMode.chase,
+      gapWidth: 88.0,
+      triggerPlayerX: 1888.0,
+      chaseSpeed: 205.0,
+      stopGapX: 512.0,
+    ));
+    // Floor bridging into Passage 2 and Platform 3 entry safe zone
+    w.add(GroundBlock(position: Vector2(2464, 552), size: Vector2(296, 200)));
+    // Passage 2: Checkpoint 2
+    w.add(CheckpointFlag(checkpointId: 2, position: Vector2(2592, 552)));
 
-    // Pit 2: stepping pillar
-    w.add(GroundBlock(position: Vector2(876, 496), size: Vector2(52, 256)));
-    w.add(PickupItem(type: PickupType.coin, position: Vector2(902, 446)));
-
-    // Floor 3: exit area
-    w.add(GroundBlock(position: Vector2(960, 552), size: Vector2(224, 200)));
-    w.add(PickupItem(type: PickupType.coin, position: Vector2(1040, 500)));
-    w.add(ExitPortal(position: Vector2(1128, 552)));
+    // Room 3 / Platform 3 (x: 2656..3744)
+    // Proximity hesitation anti-second-guessing gap floor
+    w.add(MovingGapFloor(
+      trapId: 'l1_p3_hesitation',
+      position: Vector2(2760, 552),
+      size: Vector2(824, 200),
+      mode: MovingGapMode.hesitation,
+      gapWidth: 92.0,
+      activateRoomX: 2560.0,
+      initialGapLocalX: 300.0,
+      anchorGapLocalX: 420.0,
+      proximityRangePx: 140.0,
+    ));
+    // Final exit landing slab
+    w.add(GroundBlock(position: Vector2(3584, 552), size: Vector2(160, 200)));
+    // Exit Portal door
+    w.add(ExitPortal(position: Vector2(3688, 552)));
 
     return ChamberLoadResult(
       spawnPosition: Vector2(148, 552),
-      exitX: 1128.0,
+      exitX: 3688.0,
     );
   }
 
   static ChamberLoadResult _buildLevel2(TrapDashGame game) {
     final w = game.world;
-    // Lower floor slab 1
-    w.add(GroundBlock(position: Vector2(96, 552), size: Vector2(374, 200)));
 
-    // Stepped block to upper mezzanine
-    w.add(GroundBlock(position: Vector2(256, 468), size: Vector2(84, 84)));
-    w.add(PickupItem(type: PickupType.key, position: Vector2(298, 418)));
+    // Partition upper wall roofs between rooms leaving 96px high passage tunnels (y: 456..552)
+    w.add(GroundBlock(position: Vector2(1184, 72), size: Vector2(192, 384)));
+    w.add(GroundBlock(position: Vector2(2464, 72), size: Vector2(192, 384)));
 
-    // Upper Mezzanine
-    w.add(GroundBlock(position: Vector2(380, 380), size: Vector2(440, 32)));
-    w.add(PickupItem(type: PickupType.key, position: Vector2(460, 330)));
-    w.add(TrapSpike(trapId: 's2_2', position: Vector2(560, 380), isStatic: false));
-    w.add(PickupItem(type: PickupType.key, position: Vector2(680, 330)));
+    // Room 1 / Platform 1 (x: 96..1184) + Passage 1 (x: 1184..1376)
+    // Starting floor runway
+    w.add(GroundBlock(position: Vector2(96, 552), size: Vector2(368, 200)));
+    // Stationary spike 1
+    w.add(TrapSpike(
+      trapId: 'l2_p1_stat_spike',
+      position: Vector2(332, 552),
+      isStatic: true,
+      behavior: SpikeBehavior.stationary,
+    ));
+    // Platform 1: Proximity open gap that starts chasing right only after player crosses (x >= 568)
+    w.add(MovingGapFloor(
+      trapId: 'l2_p1_chase_gap',
+      position: Vector2(464, 552),
+      size: Vector2(720, 200),
+      mode: MovingGapMode.chase,
+      gapWidth: 88.0,
+      triggerPlayerX: 418.0,
+      chaseStartPlayerX: 568.0,
+      chaseSpeed: 215.0,
+      stopGapX: 624.0,
+    ));
 
-    // Lower underpass Pit 1
-    w.add(FakeFloor(trapId: 'f2_1', position: Vector2(478, 552), size: Vector2(74, 24)));
+    // Continuous solid floor bridging Passage 1, all of Platform 2, Passage 2, and Platform 3 entry
+    w.add(GroundBlock(position: Vector2(1184, 552), size: Vector2(1816, 200)));
+    // Passage 1: Checkpoint 1
+    w.add(CheckpointFlag(checkpointId: 1, position: Vector2(1312, 552)));
 
-    // Lower mid floor
-    w.add(GroundBlock(position: Vector2(560, 552), size: Vector2(280, 200)));
-    w.add(CheckpointFlag(checkpointId: 1, position: Vector2(640, 552)));
-    w.add(PickupItem(type: PickupType.key, position: Vector2(750, 502)));
+    // Room 2 / Platform 2 (x: 1376..2464, Zero Gaps)
+    // Spike 2A: Slide right on jump to trap forward landing
+    w.add(TrapSpike(
+      trapId: 'l2_p2_slide_spike',
+      position: Vector2(1780, 552),
+      behavior: SpikeBehavior.slideRightOnJump,
+      slideRightDistance: 96.0,
+      slideSpeed: 460.0,
+    ));
+    // Spike 2B: Close-trigger flush pop-up spike right next to Passage 2
+    w.add(TrapSpike(
+      trapId: 'l2_p2_popup_spike',
+      position: Vector2(2376, 552),
+      behavior: SpikeBehavior.proximityPopUp,
+      triggerDistance: 36.0,
+      jitterDuration: 0.08,
+      hideCompletelyWhenIdle: true,
+    ));
+    // Passage 2: Checkpoint 2
+    w.add(CheckpointFlag(checkpointId: 2, position: Vector2(2592, 552)));
 
-    // Lower underpass Pit 2
-    w.add(FakeFloor(trapId: 'f2_2', position: Vector2(852, 552), size: Vector2(72, 24)));
-
-    // Right floor and exit
-    w.add(GroundBlock(position: Vector2(936, 552), size: Vector2(248, 200)));
-    w.add(TrapSpike(trapId: 's2_1', position: Vector2(216, 552), isStatic: false));
-    w.add(TrapSpike(trapId: 's2_3', position: Vector2(1010, 552), isStatic: false));
-    w.add(PickupItem(type: PickupType.key, position: Vector2(1055, 502)));
-    w.add(ExitPortal(position: Vector2(1132, 552)));
+    // Room 3 / Platform 3 (x: 2656..3744)
+    // Spike 3A: Rising anti-jump spike (launches up to catch jumpers, walk underneath!)
+    w.add(TrapSpike(
+      trapId: 'l2_p3_rise_spike',
+      position: Vector2(2864, 552),
+      behavior: SpikeBehavior.riseOnProximity,
+      triggerDistance: 76.0,
+      riseHeight: 88.0,
+      riseSpeed: 680.0,
+    ));
+    // Platform 3: Hesitation gap
+    w.add(MovingGapFloor(
+      trapId: 'l2_p3_hesitation_gap',
+      position: Vector2(3000, 552),
+      size: Vector2(360, 200),
+      mode: MovingGapMode.hesitation,
+      gapWidth: 88.0,
+      activateRoomX: 2560.0,
+      initialGapLocalX: 180.0,
+      anchorGapLocalX: 180.0,
+      proximityRangePx: 120.0,
+    ));
+    // Platform 3: Exit landing floor
+    w.add(GroundBlock(position: Vector2(3360, 552), size: Vector2(384, 200)));
+    // Spike 3B: Double-slide boomerang spike (slides right on approach, then slides back left after player lands)
+    w.add(TrapSpike(
+      trapId: 'l2_p3_double_spike',
+      position: Vector2(3484, 552),
+      behavior: SpikeBehavior.doubleSlideTrap,
+      triggerDistance: 56.0,
+      slideRightDistance: 96.0,
+      slideLeftDistance: 80.0,
+      slideSpeed: 460.0,
+      returnSlideSpeed: 480.0,
+    ));
+    // Exit Portal door
+    w.add(ExitPortal(position: Vector2(3688, 552)));
 
     return ChamberLoadResult(
-      spawnPosition: Vector2(144, 552),
-      exitX: 1132.0,
+      spawnPosition: Vector2(148, 552),
+      exitX: 3688.0,
     );
   }
 

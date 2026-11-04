@@ -129,10 +129,7 @@ class Player extends PositionComponent
   }
 
   void cutJump() {
-    if (isEnteringDoor) return;
-    if (velocity.y < 0) {
-      velocity.y *= 0.45;
-    }
+    // Fixed jump height: upward velocity is preserved on jump release.
   }
 
   void enterDoor(Vector2 doorPosition, {required VoidCallback onComplete}) {

@@ -1,34 +1,65 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="40" height="23" tilewidth="32" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="20">
+<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="120" height="23" tilewidth="32" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="30">
  <properties>
   <property name="levelNumber" type="int" value="1"/>
   <property name="timeLimit" type="float" value="90.0"/>
+  <property name="roomCount" type="int" value="3"/>
  </properties>
  <objectgroup id="1" name="Walls">
-  <object id="1" name="CeilingOverhang" x="448" y="72" width="736" height="196"/>
-  <object id="2" name="Floor1" x="96" y="552" width="264" height="200"/>
-  <object id="3" name="Floor2" x="544" y="552" width="296" height="200"/>
-  <object id="4" name="SteppingPillar" x="876" y="496" width="52" height="256"/>
-  <object id="5" name="Floor3" x="960" y="552" width="224" height="200"/>
+  <object id="1" name="Passage1Roof" x="1184" y="72" width="192" height="384"/>
+  <object id="2" name="Passage2Roof" x="2464" y="72" width="192" height="384"/>
+  <object id="3" name="Floor1" x="96" y="552" width="480" height="200"/>
+  <object id="4" name="Floor2" x="668" y="552" width="892" height="200"/>
+  <object id="5" name="FloorIsland" x="1648" y="552" width="104" height="200"/>
+  <object id="6" name="Floor3" x="2464" y="552" width="296" height="200"/>
+  <object id="7" name="FloorExit" x="3584" y="552" width="160" height="200"/>
  </objectgroup>
  <objectgroup id="2" name="Objects">
   <object id="10" name="Spawn" x="148" y="552" width="24" height="38"/>
-  <object id="11" name="HintArrow" x="190" y="500" width="24" height="24"/>
-  <object id="12" name="HintArrow" x="220" y="500" width="24" height="24"/>
-  <object id="13" name="StaticSpike" x="268" y="552" width="36" height="26"/>
-  <object id="14" name="FakeFloor" x="376" y="552" width="64" height="24"/>
-  <object id="15" name="Coin" x="408" y="500" width="18" height="18"/>
-  <object id="16" name="FakeFloor" x="460" y="552" width="64" height="24"/>
-  <object id="17" name="Coin" x="492" y="500" width="18" height="18"/>
-  <object id="18" name="Checkpoint" x="600" y="552" width="28" height="20">
+  <object id="11" name="SuddenGap" x="576" y="552" width="92" height="200">
+   <properties>
+    <property name="triggerLeadPx" type="float" value="46.0"/>
+   </properties>
+  </object>
+  <object id="12" name="Checkpoint" x="1312" y="552" width="28" height="20">
    <properties>
     <property name="checkpointId" type="int" value="1"/>
    </properties>
   </object>
-  <object id="19" name="Coin" x="680" y="500" width="18" height="18"/>
-  <object id="20" name="TrapSpike" x="750" y="552" width="36" height="26"/>
-  <object id="21" name="Coin" x="902" y="446" width="18" height="18"/>
-  <object id="22" name="Coin" x="1040" y="500" width="18" height="18"/>
-  <object id="23" name="ExitPortal" x="1128" y="552" width="45" height="40"/>
+  <object id="13" name="SuddenGap" x="1560" y="552" width="88" height="200">
+   <properties>
+    <property name="triggerLeadPx" type="float" value="44.0"/>
+   </properties>
+  </object>
+  <object id="14" name="SuddenGap" x="1752" y="552" width="88" height="200">
+   <properties>
+    <property name="triggerLeadPx" type="float" value="44.0"/>
+   </properties>
+  </object>
+  <object id="15" name="MovingGapFloor" x="1840" y="552" width="624" height="200">
+   <properties>
+    <property name="chaseSpeed" type="float" value="205.0"/>
+    <property name="gapWidth" type="float" value="88.0"/>
+    <property name="mode" value="chase"/>
+    <property name="stopGapX" type="float" value="512.0"/>
+    <property name="triggerPlayerX" type="float" value="1888.0"/>
+   </properties>
+  </object>
+  <object id="16" name="Checkpoint" x="2592" y="552" width="28" height="20">
+   <properties>
+    <property name="checkpointId" type="int" value="2"/>
+   </properties>
+  </object>
+  <object id="17" name="MovingGapFloor" x="2760" y="552" width="824" height="200">
+   <properties>
+    <property name="activateRoomX" type="float" value="2560.0"/>
+    <property name="anchorGapLocalX" type="float" value="420.0"/>
+    <property name="gapWidth" type="float" value="92.0"/>
+    <property name="initialGapLocalX" type="float" value="300.0"/>
+    <property name="mode" value="hesitation"/>
+    <property name="proximityRangePx" type="float" value="140.0"/>
+   </properties>
+  </object>
+  <object id="18" name="ExitPortal" x="3688" y="552" width="45" height="40"/>
  </objectgroup>
 </map>

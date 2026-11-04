@@ -39,7 +39,7 @@ void main() {
       expect(player.isOnGround, isFalse);
     });
 
-    test('Variable jump cut cuts upward velocity when releasing jump early', () {
+    test('Fixed jump height preserves upward velocity when releasing jump early', () {
       player.isOnGround = true;
       player.jump();
       player.update(0.016);
@@ -48,7 +48,7 @@ void main() {
       expect(initialJumpVelocity, lessThan(0));
 
       player.cutJump();
-      expect(player.velocity.y, closeTo(initialJumpVelocity * 0.45, 0.01));
+      expect(player.velocity.y, equals(initialJumpVelocity));
     });
 
     test('Coyote time allows jump shortly after leaving ground', () {

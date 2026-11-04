@@ -5,6 +5,7 @@ class LevelConfig {
   final double timeLimit;
   final int initialHearts;
   final int requiredKeys;
+  final int roomCount;
 
   const LevelConfig({
     required this.levelNumber,
@@ -13,24 +14,27 @@ class LevelConfig {
     required this.timeLimit,
     required this.initialHearts,
     this.requiredKeys = 0,
+    this.roomCount = 1,
   });
 
   static const List<LevelConfig> _allLevels = [
     LevelConfig(
       levelNumber: 1,
       tmxFile: 'Level01.tmx',
-      goalText: 'Reach the Exit Portal in 90s (Watch for cracked tiles!)',
+      goalText: 'Cross 3 Platforms & Reach the Exit in 90s',
       timeLimit: 90.0,
       initialHearts: 5,
       requiredKeys: 0,
+      roomCount: 3,
     ),
     LevelConfig(
       levelNumber: 2,
       tmxFile: 'Level02.tmx',
-      goalText: 'Collect 5 Keys & Reach the Exit in 75s',
+      goalText: 'Outsmart the Deceptive Spikes & Exit in 75s',
       timeLimit: 75.0,
       initialHearts: 5,
-      requiredKeys: 5,
+      requiredKeys: 0,
+      roomCount: 3,
     ),
     LevelConfig(
       levelNumber: 3,

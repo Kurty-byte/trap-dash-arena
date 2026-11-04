@@ -22,7 +22,8 @@ void main() {
       final l2 = LevelConfig.get(2);
       expect(l2.timeLimit, equals(75.0));
       expect(l2.initialHearts, equals(5));
-      expect(l2.requiredKeys, equals(5));
+      expect(l2.requiredKeys, equals(0));
+      expect(l2.roomCount, equals(3));
 
       final l3 = LevelConfig.get(3);
       expect(l3.timeLimit, equals(70.0));
