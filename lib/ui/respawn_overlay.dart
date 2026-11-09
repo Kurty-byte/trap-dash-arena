@@ -12,26 +12,34 @@ class RespawnOverlay extends StatelessWidget {
     final controller = game.controller;
 
     return Positioned.fill(
-      child: IgnorePointer(
-        ignoring: false,
-        child: Center(
-          child: Container(
-            width: 320,
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
-            decoration: BoxDecoration(
-              color: AppPalette.yellowBackground,
-              border: Border.all(color: AppPalette.brownSolid, width: 3),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x66000000),
-                  blurRadius: 16,
-                  offset: Offset(0, 6),
-                ),
-              ],
+      child: Stack(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => game.triggerRespawn(),
+            child: const ModalBarrier(
+              dismissible: false,
+              color: Color(0x66000000),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+          ),
+          Center(
+            child: Container(
+              width: 320,
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+              decoration: BoxDecoration(
+                color: AppPalette.yellowBackground,
+                border: Border.all(color: AppPalette.brownSolid, width: 3),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x66000000),
+                    blurRadius: 16,
+                    offset: Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 const Text(
                   'YOU DIED',
                   style: TextStyle(
@@ -110,7 +118,8 @@ class RespawnOverlay extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      ],
+    ),
+  );
   }
 }

@@ -35,43 +35,48 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildLoadingIndicator() {
-    return Container(
-      color: AppPalette.yellowBackground,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/game/icon.png',
-              width: 56,
-              height: 56,
-              filterQuality: FilterQuality.none,
-              errorBuilder: (context, error, stackTrace) =>
-                  const SizedBox(width: 56, height: 56),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'LOADING...',
-              style: TextStyle(
-                fontFamily: 'PressStart2P',
-                fontSize: 18,
-                color: AppPalette.playerBlack,
-                letterSpacing: 2,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'LEVEL ${widget.levelNumber}',
-              style: const TextStyle(
-                fontFamily: 'AtkinsonHyperlegible',
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppPalette.brownSolid,
-              ),
-            ),
-          ],
+    return Stack(
+      children: [
+        const ModalBarrier(
+          dismissible: false,
+          color: AppPalette.yellowBackground,
         ),
-      ),
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/game/icon.png',
+                width: 56,
+                height: 56,
+                filterQuality: FilterQuality.none,
+                errorBuilder: (context, error, stackTrace) =>
+                    const SizedBox(width: 56, height: 56),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'LOADING...',
+                style: TextStyle(
+                  fontFamily: 'PressStart2P',
+                  fontSize: 18,
+                  color: AppPalette.playerBlack,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'LEVEL ${widget.levelNumber}',
+                style: const TextStyle(
+                  fontFamily: 'AtkinsonHyperlegible',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppPalette.brownSolid,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

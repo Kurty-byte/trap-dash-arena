@@ -5,6 +5,9 @@ import 'package:trap_dash_arena/game/actors/player.dart';
 import 'package:trap_dash_arena/game/level_config.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
 import 'package:trap_dash_arena/ui/hud_overlay.dart';
+import 'package:trap_dash_arena/ui/pause_overlay.dart';
+import 'package:trap_dash_arena/ui/respawn_overlay.dart';
+import 'package:trap_dash_arena/ui/result_screen.dart';
 import 'package:trap_dash_arena/ui/touch_controls_overlay.dart';
 import 'package:trap_dash_arena/ui/widgets/hud_sprite.dart';
 
@@ -165,5 +168,100 @@ void main() {
     expect(game.player.isJumpBuffered, isTrue);
 
     await jumpGesture.up();
+  });
+
+  testWidgets('PauseOverlay blocks clicks to HudOverlay buttons underneath', (tester) async {
+    final game = TrapDashGame(initialLevelNumber: 1);
+    game.overlays.addEntry('PauseOverlay', (context, g) => const SizedBox());
+    game.controller.startLevel(LevelConfig.get(1));
+    game.pauseGame();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1280,
+            height: 720,
+            child: Stack(
+              children: [
+                HudOverlay(game: game),
+                PauseOverlay(game: game),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final pauseBtn = find.byKey(const Key('hud_pause_button'));
+    final restartBtn = find.byKey(const Key('hud_restart_button'));
+    expect(pauseBtn, findsOneWidget);
+    expect(restartBtn, findsOneWidget);
+
+    // Tapping at coordinates of pause button is absorbed by ModalBarrier
+    final pausePos = tester.getCenter(pauseBtn);
+    await tester.tapAt(pausePos);
+    await tester.pump();
+
+    expect(game.paused, isTrue);
+
+    // Dialog Resume button is clickable
+    final resumeBtn = find.widgetWithText(ElevatedButton, 'RESUME');
+    expect(resumeBtn, findsOneWidget);
+    await tester.tap(resumeBtn);
+    await tester.pump();
+    expect(game.paused, isFalse);
+  });
+
+  testWidgets('RespawnOverlay and ResultOverlay absorb clicks to HudOverlay buttons', (tester) async {
+    final game = TrapDashGame(initialLevelNumber: 1);
+    game.controller.startLevel(LevelConfig.get(1));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1280,
+            height: 720,
+            child: Stack(
+              children: [
+                HudOverlay(game: game),
+                RespawnOverlay(game: game),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final restartPos = tester.getCenter(find.byKey(const Key('hud_restart_button')));
+    await tester.tapAt(restartPos);
+    await tester.pump();
+
+    // Verify RESPAWN button on dialog is present
+    expect(find.widgetWithText(ElevatedButton, 'RESPAWN'), findsOneWidget);
+
+    // Now test ResultOverlay blocks clicks to HudOverlay buttons
+    game.controller.endLevel(true);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1280,
+            height: 720,
+            child: Stack(
+              children: [
+                HudOverlay(game: game),
+                ResultOverlay(game: game),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tapAt(restartPos);
+    await tester.pump();
+    expect(find.byType(ResultOverlay), findsOneWidget);
   });
 }

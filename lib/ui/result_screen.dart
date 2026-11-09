@@ -22,11 +22,15 @@ class ResultOverlay extends StatelessWidget {
     final isOnline = GameState.instance.mode == 'online';
 
     return Positioned.fill(
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.75),
-        child: Center(
-          child: Container(
-            width: 420,
+      child: Stack(
+        children: [
+          ModalBarrier(
+            dismissible: false,
+            color: Colors.black.withValues(alpha: 0.75),
+          ),
+          Center(
+            child: Container(
+              width: 420,
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
               color: AppPalette.yellowBackground,
@@ -321,8 +325,9 @@ class ResultOverlay extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      ],
+    ),
+  );
   }
 
   Widget _buildStatRow(String label, String value) {

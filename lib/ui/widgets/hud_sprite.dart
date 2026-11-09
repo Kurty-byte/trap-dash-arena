@@ -13,7 +13,9 @@ enum HudSpriteType {
   audioOff(col: 9, row: 1),
   back(col: 0, row: 0),
   settings(col: 3, row: 0),
-  bot(col: 6, row: 4);
+  bot(col: 6, row: 4),
+  arrowLeft(col: 0, row: 5),
+  arrowRight(col: 3, row: 5);
 
   final int col;
   final int row;

@@ -13,95 +13,100 @@ class PauseOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned.fill(
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.7),
-        child: Center(
-          child: Container(
-            width: 340,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            decoration: BoxDecoration(
-              color: AppPalette.yellowBackground,
-              border: Border.all(color: AppPalette.brownSolid, width: 3),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x66000000),
-                  blurRadius: 16,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'PAUSED',
-                  style: TextStyle(
-                    fontFamily: 'PressStart2P',
-                    fontSize: 22,
-                    color: AppPalette.playerBlack,
+      child: Stack(
+        children: [
+          ModalBarrier(
+            dismissible: false,
+            color: Colors.black.withValues(alpha: 0.7),
+          ),
+          Center(
+            child: Container(
+              width: 340,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              decoration: BoxDecoration(
+                color: AppPalette.yellowBackground,
+                border: Border.all(color: AppPalette.brownSolid, width: 3),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x66000000),
+                    blurRadius: 16,
+                    offset: Offset(0, 6),
                   ),
-                ),
-                const SizedBox(height: 24),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'PAUSED',
+                    style: TextStyle(
+                      fontFamily: 'PressStart2P',
+                      fontSize: 22,
+                      color: AppPalette.playerBlack,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
 
-                // Resume button
-                _buildButton(
-                  label: 'RESUME',
-                  color: AppPalette.brownSolid,
-                  textColor: Colors.white,
-                  onTap: () {
-                    AudioManager.instance.playSfx('unlock.wav');
-                    game.resumeGame();
-                  },
-                ),
-                const SizedBox(height: 12),
+                  // Resume button
+                  _buildButton(
+                    label: 'RESUME',
+                    color: AppPalette.brownSolid,
+                    textColor: Colors.white,
+                    onTap: () {
+                      AudioManager.instance.playSfx('unlock.wav');
+                      game.resumeGame();
+                    },
+                  ),
+                  const SizedBox(height: 12),
 
-                // Restart button
-                _buildButton(
-                  label: 'RESTART',
-                  color: AppPalette.brownDark,
-                  textColor: Colors.white,
-                  onTap: () {
-                    AudioManager.instance.playSfx('unlock.wav');
-                    game.restartLevel();
-                  },
-                ),
-                const SizedBox(height: 12),
+                  // Restart button
+                  _buildButton(
+                    label: 'RESTART',
+                    color: AppPalette.brownDark,
+                    textColor: Colors.white,
+                    onTap: () {
+                      AudioManager.instance.playSfx('unlock.wav');
+                      game.restartLevel();
+                    },
+                  ),
+                  const SizedBox(height: 12),
 
-                // Audio toggle
-                ValueListenableBuilder<bool>(
-                  valueListenable: AudioManager.instance.isMuted,
-                  builder: (context, muted, _) {
-                    return _buildButton(
-                      label: muted ? 'AUDIO: OFF' : 'AUDIO: ON',
-                      color: AppPalette.yellowBackground,
-                      textColor: AppPalette.playerBlack,
-                      borderColor: AppPalette.brownSolid,
-                      onTap: () {
-                        AudioManager.instance.toggleMute();
-                      },
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
+                  // Audio toggle
+                  ValueListenableBuilder<bool>(
+                    valueListenable: AudioManager.instance.isMuted,
+                    builder: (context, muted, _) {
+                      return _buildButton(
+                        label: muted ? 'AUDIO: OFF' : 'AUDIO: ON',
+                        color: AppPalette.yellowBackground,
+                        textColor: AppPalette.playerBlack,
+                        borderColor: AppPalette.brownSolid,
+                        onTap: () {
+                          AudioManager.instance.toggleMute();
+                        },
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
 
-                // Quit to menu
-                _buildButton(
-                  label: 'QUIT TO MENU',
-                  color: AppPalette.playerBlack,
-                  textColor: Colors.white,
-                  onTap: () {
-                    AudioManager.instance.playSfx('unlock.wav');
-                    game.resumeEngine();
-                    Navigator.of(context).pushAndRemoveUntil(
-                      ArcadePageRoute(page: const MainMenuScreen()),
-                      (route) => false,
-                    );
-                  },
-                ),
-              ],
+                  // Quit to menu
+                  _buildButton(
+                    label: 'QUIT TO MENU',
+                    color: AppPalette.playerBlack,
+                    textColor: Colors.white,
+                    onTap: () {
+                      AudioManager.instance.playSfx('unlock.wav');
+                      game.resumeEngine();
+                      Navigator.of(context).pushAndRemoveUntil(
+                        ArcadePageRoute(page: const MainMenuScreen()),
+                        (route) => false,
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

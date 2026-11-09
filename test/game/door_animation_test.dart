@@ -48,9 +48,10 @@ void main() {
       expect(completed, isTrue);
     });
 
-    test('ExitPortal collision triggers door entering animation before clearing level', () {
+    test('ExitPortal collision triggers door entering animation before clearing level', () async {
       final portal = ExitPortal(position: Vector2(500, 552));
-      game.world.add(portal);
+      await game.world.add(portal);
+      await game.ready();
 
       player.position = Vector2(495, 552);
 

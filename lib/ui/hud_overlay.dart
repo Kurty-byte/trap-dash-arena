@@ -10,6 +10,21 @@ class HudOverlay extends StatelessWidget {
 
   const HudOverlay({super.key, required this.game});
 
+  bool _canInteract(TrapDashGame game) {
+    if (game.paused) return false;
+    if (game.overlays.isActive('PauseOverlay')) return false;
+    if (game.overlays.isActive('RespawnOverlay')) return false;
+    if (game.overlays.isActive('ResultOverlay')) return false;
+    if (game.overlays.isActive('LoadingOverlay')) return false;
+    if (game.controller.isGameOver.value) return false;
+    try {
+      if (game.player.isInDeathCycle) return false;
+    } catch (_) {
+      // player not initialized yet
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = game.controller;
@@ -18,13 +33,13 @@ class HudOverlay extends StatelessWidget {
       child: RepaintBoundary(
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Top Bar seated cleanly inside the 72px top solid wall
+              // Top Bar seated cleanly inside the solid wall bezel
               SizedBox(
-                height: 58,
+                height: 46,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -36,9 +51,13 @@ class HudOverlay extends StatelessWidget {
                         HudSpriteButton(
                           key: const Key('hud_pause_button'),
                           sprite: HudSpriteType.pause,
-                          size: 32,
+                          size: 28,
                           tooltip: 'Pause',
-                          onTap: () => game.pauseGame(),
+                          onTap: () {
+                            if (_canInteract(game)) {
+                              game.pauseGame();
+                            }
+                          },
                         ),
                         const SizedBox(width: 4),
 
@@ -46,13 +65,17 @@ class HudOverlay extends StatelessWidget {
                         HudSpriteButton(
                           key: const Key('hud_restart_button'),
                           sprite: HudSpriteType.restartCw,
-                          size: 32,
+                          size: 28,
                           tooltip: 'Restart Level',
-                          onTap: () => game.restartLevel(),
+                          onTap: () {
+                            if (_canInteract(game)) {
+                              game.restartLevel();
+                            }
+                          },
                         ),
                         const SizedBox(width: 8),
 
-                        // Hearts Row
+                        // Hearts Row with high-contrast shadow
                         ValueListenableBuilder<int>(
                           valueListenable: controller.hearts,
                           builder: (context, heartsVal, _) {
@@ -66,8 +89,15 @@ class HudOverlay extends StatelessWidget {
                                     Icons.favorite_rounded,
                                     color: index < heartsVal
                                         ? AppPalette.yellowBackground
-                                        : AppPalette.playerBlack.withValues(alpha: 0.4),
-                                    size: 22,
+                                        : AppPalette.playerBlack.withValues(alpha: 0.35),
+                                    size: 19,
+                                    shadows: const [
+                                      Shadow(
+                                        color: AppPalette.playerBlack,
+                                        blurRadius: 2.0,
+                                        offset: Offset(1, 1),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -161,27 +191,27 @@ class HudOverlay extends StatelessWidget {
                                 );
                               },
                             ),
-                            const SizedBox(height: 3),
+                            const SizedBox(height: 2),
 
                             // Goal Banner
                             Flexible(
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 3,
+                                  horizontal: 8,
+                                  vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
                                   color: AppPalette.yellowBackground,
                                   border: Border.all(
                                     color: AppPalette.playerBlack,
-                                    width: 1.5,
+                                    width: 1.2,
                                   ),
                                 ),
                                 child: Text(
                                   controller.config.goalText,
                                   style: const TextStyle(
                                     fontFamily: 'AtkinsonHyperlegible',
-                                    fontSize: 13,
+                                    fontSize: 11,
                                     color: AppPalette.playerBlack,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -206,8 +236,8 @@ class HudOverlay extends StatelessWidget {
                             builder: (context, botScore, _) {
                               return Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 3,
+                                  horizontal: 5,
+                                  vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
                                   color: AppPalette.playerBlack,
@@ -220,14 +250,14 @@ class HudOverlay extends StatelessWidget {
                                   'BOT: $botScore',
                                   style: const TextStyle(
                                     fontFamily: 'PressStart2P',
-                                    fontSize: 9,
+                                    fontSize: 8,
                                     color: AppPalette.yellowBackground,
                                   ),
                                 ),
                               );
                             },
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                         ],
 
                         // Timer
@@ -240,14 +270,14 @@ class HudOverlay extends StatelessWidget {
                                 const Icon(
                                   Icons.timer_outlined,
                                   color: AppPalette.yellowBackground,
-                                  size: 18,
+                                  size: 16,
                                 ),
                                 const SizedBox(width: 3),
                                 Text(
                                   '${secondsVal}s',
                                   style: const TextStyle(
                                     fontFamily: 'PressStart2P',
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     color: AppPalette.yellowBackground,
                                   ),
                                 ),
@@ -255,7 +285,7 @@ class HudOverlay extends StatelessWidget {
                             );
                           },
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
 
                         // Score
                         ValueListenableBuilder<int>(
@@ -265,7 +295,7 @@ class HudOverlay extends StatelessWidget {
                               '$scoreVal PTS',
                               style: const TextStyle(
                                 fontFamily: 'PressStart2P',
-                                fontSize: 12,
+                                fontSize: 11,
                                 color: AppPalette.yellowBackground,
                                 fontWeight: FontWeight.bold,
                               ),

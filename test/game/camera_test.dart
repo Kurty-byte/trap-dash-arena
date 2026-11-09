@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trap_dash_arena/autoload/palette.dart';
+import 'package:trap_dash_arena/game/actors/chamber_background.dart';
 import 'package:trap_dash_arena/game/chamber_loader.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
 
@@ -11,6 +13,10 @@ void main() {
     final img = await game.images.load('game/player.png');
     expect(img.width, equals(200));
     await game.onLoad();
+
+    // Solid wall background covers full canvas
+    expect(game.backgroundColor(), equals(AppPalette.brownSolid));
+    expect(game.world.children.whereType<ChamberBackground>().length, equals(1));
 
     expect(game.camera.world, isNotNull);
     expect(game.player, isNotNull);

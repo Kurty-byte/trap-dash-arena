@@ -22,7 +22,27 @@ class _TouchControlsOverlayState extends State<TouchControlsOverlay> {
   bool _rightHeld = false;
   bool _jumpHeld = false;
 
+  bool get _canControl {
+    final game = widget.game;
+    if (game.paused) return false;
+    if (game.overlays.isActive('PauseOverlay')) return false;
+    if (game.overlays.isActive('RespawnOverlay')) return false;
+    if (game.overlays.isActive('ResultOverlay')) return false;
+    if (game.overlays.isActive('LoadingOverlay')) return false;
+    if (game.controller.isGameOver.value) return false;
+    try {
+      if (game.player.isInDeathCycle) return false;
+    } catch (_) {
+      // player not initialized yet
+    }
+    return true;
+  }
+
   void _updateHorizontalMovement() {
+    if (!_canControl) {
+      widget.game.player.stopMoving();
+      return;
+    }
     if (_leftHeld && !_rightHeld) {
       widget.game.player.moveLeft();
     } else if (_rightHeld && !_leftHeld) {
@@ -95,6 +115,7 @@ class _TouchControlsOverlayState extends State<TouchControlsOverlay> {
                 visualHeight: 68.0,
                 isPressed: _jumpHeld,
                 onDown: () {
+                  if (!_canControl) return;
                   setState(() => _jumpHeld = true);
                   widget.game.player.jump();
                 },
