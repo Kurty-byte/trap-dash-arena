@@ -137,7 +137,7 @@ void main() {
       // Retract resets to 1780
       spike.retract();
       expect(spike.isTriggered, isFalse);
-      expect(spike.isRevealed, isTrue);
+      expect(spike.isRevealed, isFalse);
       expect(spike.position.x, equals(1780.0));
     });
 

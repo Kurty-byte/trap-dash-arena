@@ -127,7 +127,7 @@ class FallingBlock extends PositionComponent
     isTriggered = false;
     isFalling = false;
     hasLanded = false;
-    isRevealed = true; // Retains memory after death!
+    isRevealed = false;
     _telegraphTimer = 0.25;
     _shakeOffsetX = 0.0;
     _fallVelocity = 0.0;
@@ -180,7 +180,7 @@ class FallingBlock extends PositionComponent
       _bombSprite!.render(canvas, size: size);
     } else {
       // In ceiling: disguised as flat brown ceiling block with slight discolored tell
-      final blockPaint = (isRevealed || isHighContrast)
+      final blockPaint = isHighContrast
           ? _warningBlockPaint
           : _defaultBlockPaint;
       canvas.drawRect(_rect, blockPaint);

@@ -93,7 +93,7 @@ class FakeFloor extends PositionComponent
   void resetToSolid() {
     isStepped = false;
     isCrumbled = false;
-    isRevealed = true; // Retains memory after death so player knows it is a trap!
+    isRevealed = false;
     _crumbleTimer = 0.30;
     _survivalTimer = 0.50;
     hitbox.collisionType = CollisionType.passive;
@@ -127,12 +127,12 @@ class FakeFloor extends PositionComponent
     canvas.drawRect(_rect, _floorPaint);
 
     // Crack tell (1.5px hairline crack in background yellow)
-    final crackPaint = (isHighContrast || isRevealed)
+    final crackPaint = isHighContrast
         ? _revealedCrackPaint
         : _subtleCrackPaint;
     canvas.drawPath(_crackPath, crackPaint);
 
-    if (isRevealed || isHighContrast) {
+    if (isHighContrast) {
       canvas.drawRect(_rect, _borderPaint);
     }
 

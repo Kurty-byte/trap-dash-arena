@@ -90,7 +90,7 @@ class SuddenGap extends PositionComponent
 
   void resetToSolid() {
     isTriggered = false;
-    isRevealed = true;
+    isRevealed = false;
     _dropOffsetY = 0.0;
     _survivalTimer = 0.50;
     _baitAwarded = false;
@@ -130,7 +130,7 @@ class SuddenGap extends PositionComponent
     final rect = Rect.fromLTWH(-0.5, -0.5, size.x + 1.0, size.y + 1.0);
     canvas.drawRect(rect, _floorPaint);
 
-    if (isRevealed || isHighContrast) {
+    if (isHighContrast) {
       canvas.drawRect(
         Rect.fromLTWH(0, 0, size.x, 3),
         _warningPaint,

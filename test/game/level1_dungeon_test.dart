@@ -61,10 +61,10 @@ void main() {
       expect(gap.isTriggered, isTrue);
       expect(gap.hitbox.collisionType, equals(CollisionType.inactive));
 
-      // After resetToSolid, gap becomes solid again and marked revealed
+      // After resetToSolid, gap becomes solid again and resets clean
       gap.resetToSolid();
       expect(gap.isTriggered, isFalse);
-      expect(gap.isRevealed, isTrue);
+      expect(gap.isRevealed, isFalse);
       expect(gap.hitbox.collisionType, equals(CollisionType.passive));
     });
 
@@ -113,7 +113,7 @@ void main() {
       // Reset
       floor.resetToInitial();
       expect(floor.isGapOpen, isFalse);
-      expect(floor.isRevealed, isTrue);
+      expect(floor.isRevealed, isFalse);
       expect(floor.gapLocalX, equals(0.0));
     });
 

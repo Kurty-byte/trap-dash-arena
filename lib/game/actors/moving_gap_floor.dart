@@ -189,7 +189,7 @@ class MovingGapFloor extends PositionComponent
 
   void resetToInitial() {
     isGapOpen = false;
-    isRevealed = true;
+    isRevealed = false;
     gapLocalX = mode == MovingGapMode.hesitation ? initialGapLocalX : 0.0;
     _survivalTimer = 0.50;
     _baitAwarded = false;
@@ -254,7 +254,7 @@ class MovingGapFloor extends PositionComponent
     if (!isGapOpen) {
       final rect = Rect.fromLTWH(-0.5, -0.5, size.x + 1.0, size.y + 1.0);
       canvas.drawRect(rect, _floorPaint);
-      if (isRevealed || isHighContrast) {
+      if (isHighContrast) {
         canvas.drawRect(Rect.fromLTWH(0, 0, size.x, 3), _warningEdgePaint);
       }
       return;
@@ -266,7 +266,7 @@ class MovingGapFloor extends PositionComponent
       final leftRect = Rect.fromLTWH(-0.5, -0.5, leftW + 0.5, size.y + 1.0);
       canvas.drawRect(leftRect, _floorPaint);
 
-      if (isRevealed || isHighContrast) {
+      if (isHighContrast) {
         canvas.drawLine(
           Offset(leftW, 0),
           Offset(leftW, min(24.0, size.y)),
@@ -287,7 +287,7 @@ class MovingGapFloor extends PositionComponent
       );
       canvas.drawRect(rightRect, _floorPaint);
 
-      if (isRevealed || isHighContrast) {
+      if (isHighContrast) {
         canvas.drawLine(
           Offset(rightStart, 0),
           Offset(rightStart, min(24.0, size.y)),
