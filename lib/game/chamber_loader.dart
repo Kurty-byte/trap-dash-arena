@@ -2,7 +2,9 @@ import 'dart:io';
 import 'package:flame/components.dart';
 import 'package:flame_tiled/flame_tiled.dart';
 import 'package:flutter/foundation.dart';
+import 'package:trap_dash_arena/game/actors/chamber_background.dart';
 import 'package:trap_dash_arena/game/actors/checkpoint_flag.dart';
+import 'package:trap_dash_arena/game/actors/control_inverter_zone.dart';
 import 'package:trap_dash_arena/game/actors/disappearing_platform.dart';
 import 'package:trap_dash_arena/game/actors/exit_portal.dart';
 import 'package:trap_dash_arena/game/actors/fake_floor.dart';
@@ -41,7 +43,10 @@ class ChamberLoader {
     TrapDashGame game,
     LevelConfig config,
   ) async {
-    // 1. Always spawn outer solid enclosure walls (+32px bleed margin to prevent camera shake bleed)
+    // 0. Render yellow room background strictly inside room corridors and passages
+    game.world.add(ChamberBackground(roomCount: config.roomCount));
+
+    // 1. Always spawn outer solid enclosure walls with 3000px bleed margins
     _spawnPerimeterShell(game.world, roomCount: config.roomCount);
 
     // In unit/widget tests, use fast programmatic chamber directly to avoid asset bundle timeouts
@@ -65,6 +70,7 @@ class ChamberLoader {
     } catch (_) {
       // In headless test environments or asset bundle fallbacks
       game.world.removeAll(game.world.children);
+      game.world.add(ChamberBackground(roomCount: config.roomCount));
       _spawnPerimeterShell(game.world, roomCount: config.roomCount);
     }
 
@@ -72,24 +78,30 @@ class ChamberLoader {
   }
 
   static void _spawnPerimeterShell(World world, {int roomCount = 1}) {
-    // Left outer wall (inner edge at x = 96)
+    // Left outer wall (inner edge at x = 96, extends 3000px left and 3000px up/down)
     world.add(GroundBlock(
-      position: Vector2(-32, -32),
-      size: Vector2(128, 784),
+      position: Vector2(-3000, -3000),
+      size: Vector2(3096, 6720),
     ));
 
-    // Right outer wall (inner edge at x = roomCount * 1280 - 96)
+    // Right outer wall (inner edge at x = roomCount * 1280 - 96, extends 3000px right)
     final rightWallX = roomCount * 1280.0 - 96.0;
     world.add(GroundBlock(
-      position: Vector2(rightWallX, -32),
-      size: Vector2(128, 784),
+      position: Vector2(rightWallX, -3000),
+      size: Vector2(3096, 6720),
     ));
 
-    // Top ceiling wall (inner edge at y = 72)
-    final ceilingW = roomCount * 1280.0 + 64.0;
+    // Top ceiling wall (inner edge at y = 104, extends 3000px up)
+    final ceilingW = roomCount * 1280.0 + 6000.0;
     world.add(GroundBlock(
-      position: Vector2(-32, -32),
-      size: Vector2(ceilingW, 104),
+      position: Vector2(-3000, -3000),
+      size: Vector2(ceilingW, 3104),
+    ));
+
+    // Deep sub-floor base below pit depth (y: 780..3780)
+    world.add(GroundBlock(
+      position: Vector2(-3000, 780),
+      size: Vector2(ceilingW, 3000),
     ));
   }
 
@@ -150,6 +162,12 @@ class ChamberLoader {
                 case 'doubleSlideTrap':
                   beh = SpikeBehavior.doubleSlideTrap;
                   break;
+                case 'remotePopUp':
+                  beh = SpikeBehavior.remotePopUp;
+                  break;
+                case 'oscillateTwice':
+                  beh = SpikeBehavior.oscillateTwice;
+                  break;
               }
             }
             final isStat = obj.properties.getValue<bool>('isStatic') ?? false;
@@ -162,6 +180,10 @@ class ChamberLoader {
             final retSlideSpd = obj.properties.getValue<double>('returnSlideSpeed') ?? 480.0;
             final riseH = obj.properties.getValue<double>('riseHeight') ?? 88.0;
             final riseSpd = obj.properties.getValue<double>('riseSpeed') ?? 680.0;
+            final remoteX = obj.properties.getValue<double>('remoteTriggerX') ?? 0.0;
+            final remoteMaxX = obj.properties.getValue<double>('remoteTriggerMaxX') ?? double.infinity;
+            final remoteMaxY = obj.properties.getValue<double>('remoteTriggerMaxY') ?? double.infinity;
+            final remoteGrounded = obj.properties.getValue<bool>('remoteRequireGrounded') ?? false;
             game.world.add(TrapSpike(
               trapId: 's_${obj.id}',
               position: pos,
@@ -176,6 +198,23 @@ class ChamberLoader {
               returnSlideSpeed: retSlideSpd,
               riseHeight: riseH,
               riseSpeed: riseSpd,
+              remoteTriggerX: remoteX,
+              remoteTriggerMaxX: remoteMaxX,
+              remoteTriggerMaxY: remoteMaxY,
+              remoteRequireGrounded: remoteGrounded,
+            ));
+            break;
+          case 'ControlInverterZone':
+            final targetInv = obj.properties.getValue<bool>('targetInverted') ?? true;
+            final reqGrounded = obj.properties.getValue<bool>('requireGrounded') ?? false;
+            final fullHeight = obj.properties.getValue<bool>('triggerFullHeight');
+            game.world.add(ControlInverterZone(
+              trapId: 'ciz_${obj.id}',
+              position: pos,
+              size: size,
+              targetInverted: targetInv,
+              requireGrounded: reqGrounded,
+              triggerFullHeight: fullHeight,
             ));
             break;
           case 'FakeFloor':
@@ -329,8 +368,8 @@ class ChamberLoader {
     final w = game.world;
 
     // Partition upper wall roofs between rooms leaving 96px high passage tunnels (y: 456..552)
-    w.add(GroundBlock(position: Vector2(1184, 72), size: Vector2(192, 384)));
-    w.add(GroundBlock(position: Vector2(2464, 72), size: Vector2(192, 384)));
+    w.add(GroundBlock(position: Vector2(1184, 104), size: Vector2(192, 352)));
+    w.add(GroundBlock(position: Vector2(2464, 104), size: Vector2(192, 352)));
 
     // Room 1 / Platform 1 (x: 96..1184) + Passage 1 (x: 1184..1376)
     // Starting floor slab
@@ -408,8 +447,8 @@ class ChamberLoader {
     final w = game.world;
 
     // Partition upper wall roofs between rooms leaving 96px high passage tunnels (y: 456..552)
-    w.add(GroundBlock(position: Vector2(1184, 72), size: Vector2(192, 384)));
-    w.add(GroundBlock(position: Vector2(2464, 72), size: Vector2(192, 384)));
+    w.add(GroundBlock(position: Vector2(1184, 104), size: Vector2(192, 352)));
+    w.add(GroundBlock(position: Vector2(2464, 104), size: Vector2(192, 352)));
 
     // Room 1 / Platform 1 (x: 96..1184) + Passage 1 (x: 1184..1376)
     // Starting floor runway
@@ -506,50 +545,265 @@ class ChamberLoader {
 
   static ChamberLoadResult _buildLevel3(TrapDashGame game) {
     final w = game.world;
-    // Solid ceiling overhang slab down to y = 200
-    w.add(GroundBlock(position: Vector2(96, 72), size: Vector2(924, 128)));
 
-    // Floor 1
-    w.add(GroundBlock(position: Vector2(96, 552), size: Vector2(334, 200)));
-    w.add(FallingBlock(trapId: 'fb3_1', position: Vector2(240, 200), groundY: 552));
-    w.add(FallingBlock(trapId: 'fb3_2', position: Vector2(350, 200), groundY: 552));
+    // Partition upper wall roofs between rooms leaving 96px high passage tunnels (y: 456..552)
+    w.add(GroundBlock(position: Vector2(1184, 104), size: Vector2(192, 352)));
+    w.add(GroundBlock(position: Vector2(2464, 104), size: Vector2(192, 352)));
 
-    // Pit 1
-    w.add(FakeFloor(trapId: 'f3_1', position: Vector2(438, 552), size: Vector2(80, 24)));
+    // Passage checkpoints
+    w.add(CheckpointFlag(checkpointId: 1, position: Vector2(1312, 552)));
+    w.add(CheckpointFlag(checkpointId: 2, position: Vector2(2592, 552)));
 
-    // Mid floor
-    w.add(GroundBlock(position: Vector2(526, 552), size: Vector2(264, 200)));
-    w.add(CheckpointFlag(checkpointId: 1, position: Vector2(590, 552)));
-    w.add(PickupItem(type: PickupType.coin, position: Vector2(590, 500)));
-    w.add(FallingBlock(trapId: 'fb3_3', position: Vector2(700, 200), groundY: 552));
+    // ==========================================
+    // Room 1 / Platform 1 (x: 96..1184)
+    // ==========================================
+    // Starting floor runway (x: 96..340)
+    w.add(GroundBlock(position: Vector2(96, 552), size: Vector2(244, 200)));
 
-    // Pit 2
-    w.add(DisappearingPlatform(position: Vector2(802, 524), size: Vector2(72, 20)));
-
-    // Floor 3
-    w.add(GroundBlock(position: Vector2(886, 552), size: Vector2(174, 200)));
-    w.add(FallingBlock(trapId: 'fb3_4', position: Vector2(930, 200), groundY: 552));
-
-    // Elevated right alcove ledge
-    w.add(GroundBlock(position: Vector2(1060, 464), size: Vector2(124, 288)));
-
-    // Decoy exit portal
-    w.add(ExitPortal(
-      position: Vector2(995, 552),
-      isFakeFirst: true,
-      realTargetPosition: Vector2(1132, 464),
+    // Walk Inverter 0: mid-walk trigger inverts controls before Gap 1
+    w.add(ControlInverterZone(
+      trapId: 'l3_p1_inv_0',
+      position: Vector2(268, 520),
+      size: Vector2(40, 40),
+      targetInverted: true,
+      requireGrounded: false,
+      triggerFullHeight: true,
     ));
 
+    // Gap 1 (x: 340..424, width 84)
+    w.add(SuddenGap(
+      trapId: 'l3_p1_gap1',
+      position: Vector2(340, 552),
+      size: Vector2(84, 200),
+      triggerLeadPx: 76.0,
+    ));
+
+    // Island 1 (x: 424..604, width 180)
+    w.add(GroundBlock(position: Vector2(424, 552), size: Vector2(180, 200)));
+    // Island 1 Inverter: grounded landing flips to Normal
+    w.add(ControlInverterZone(
+      trapId: 'l3_p1_inv_1',
+      position: Vector2(434, 520),
+      size: Vector2(150, 40),
+      targetInverted: false,
+      requireGrounded: true,
+    ));
+
+    // Gap 2 (x: 604..688, width 84)
+    w.add(SuddenGap(
+      trapId: 'l3_p1_gap2',
+      position: Vector2(604, 552),
+      size: Vector2(84, 200),
+      triggerLeadPx: 52.0,
+    ));
+
+    // Island 2 (x: 688..868, width 180)
+    w.add(GroundBlock(position: Vector2(688, 552), size: Vector2(180, 200)));
+    // Island 2 Inverter: grounded landing flips to Inverted
+    w.add(ControlInverterZone(
+      trapId: 'l3_p1_inv_2',
+      position: Vector2(698, 520),
+      size: Vector2(150, 40),
+      targetInverted: true,
+      requireGrounded: true,
+    ));
+
+    // Gap 3 (x: 868..952, width 84)
+    w.add(SuddenGap(
+      trapId: 'l3_p1_gap3',
+      position: Vector2(868, 552),
+      size: Vector2(84, 200),
+      triggerLeadPx: 52.0,
+    ));
+
+    // Landing floor extending into Passage 1 (x: 952..1720)
+    w.add(GroundBlock(position: Vector2(952, 552), size: Vector2(768, 200)));
+    // Landing Inverter: grounded landing flips back to Normal
+    w.add(ControlInverterZone(
+      trapId: 'l3_p1_inv_3',
+      position: Vector2(962, 520),
+      size: Vector2(150, 40),
+      targetInverted: false,
+      requireGrounded: true,
+    ));
+
+    // ==========================================
+    // Room 2 / Platform 2 (x: 1376..2464)
+    // ==========================================
+    // Rear spike pops up behind player at x = 1468
+    w.add(TrapSpike(
+      trapId: 'l3_p2_rear_spike',
+      position: Vector2(1468, 552),
+      behavior: SpikeBehavior.remotePopUp,
+      remoteTriggerX: 1548.0,
+      remoteTriggerMaxX: 1700.0,
+      hideCompletelyWhenIdle: true,
+    ));
+
+    // Invert trigger right after spike appearance: punishes holding Right!
+    w.add(ControlInverterZone(
+      trapId: 'l3_p2_inv_on',
+      position: Vector2(1568, 520),
+      size: Vector2(40, 40),
+      targetInverted: true,
+      requireGrounded: false,
+      triggerFullHeight: true,
+    ));
+
+    // Gap 2A (x: 1720..1804, width 84)
+    w.add(SuddenGap(
+      trapId: 'l3_p2_gap1',
+      position: Vector2(1720, 552),
+      size: Vector2(84, 200),
+      triggerLeadPx: 52.0,
+    ));
+
+    // Mid Island (x: 1804..1964, width 160) - stays inverted!
+    w.add(GroundBlock(position: Vector2(1804, 552), size: Vector2(160, 200)));
+
+    // Gap 2B (x: 1964..2048, width 84)
+    w.add(SuddenGap(
+      trapId: 'l3_p2_gap2',
+      position: Vector2(1964, 552),
+      size: Vector2(84, 200),
+      triggerLeadPx: 52.0,
+    ));
+
+    // Post-gap runway extending through Passage 2 (x: 2048..2748)
+    w.add(GroundBlock(position: Vector2(2048, 552), size: Vector2(700, 200)));
+
+    // Grounded un-invert zone after landing from last gap
+    w.add(ControlInverterZone(
+      trapId: 'l3_p2_inv_off',
+      position: Vector2(2100, 520),
+      size: Vector2(120, 40),
+      targetInverted: false,
+      requireGrounded: true,
+    ));
+
+    // Cheap proximity pop-up spike right beside Passage 2
+    w.add(TrapSpike(
+      trapId: 'l3_p2_passage_spike',
+      position: Vector2(2376, 552),
+      behavior: SpikeBehavior.proximityPopUp,
+      triggerDistance: 36.0,
+      jitterDuration: 0.08,
+      hideCompletelyWhenIdle: true,
+    ));
+
+    // ==========================================
+    // Room 3 / Platform 3 (x: 2656..3744)
+    // ==========================================
+    // Starts as Inverted at room entry
+    w.add(ControlInverterZone(
+      trapId: 'l3_p3_entry_inv',
+      position: Vector2(2668, 520),
+      size: Vector2(50, 40),
+      targetInverted: true,
+      requireGrounded: false,
+      triggerFullHeight: true,
+    ));
+
+    // Staircase steps (each 92px wide, 52px rise):
+    // Step 1: y = 500 (rise 52 from 552)
+    w.add(GroundBlock(position: Vector2(2748, 500), size: Vector2(92, 252)));
+    w.add(ControlInverterZone(
+      trapId: 'l3_p3_step1_inv',
+      position: Vector2(2752, 470),
+      size: Vector2(84, 30),
+      targetInverted: false,
+      requireGrounded: true,
+    ));
+
+    // Step 2: y = 448 (rise 52 from 500)
+    w.add(GroundBlock(position: Vector2(2840, 448), size: Vector2(92, 304)));
+    w.add(ControlInverterZone(
+      trapId: 'l3_p3_step2_inv',
+      position: Vector2(2844, 418),
+      size: Vector2(84, 30),
+      targetInverted: true,
+      requireGrounded: true,
+    ));
+
+    // Step 3: y = 396 (rise 52 from 448)
+    w.add(GroundBlock(position: Vector2(2932, 396), size: Vector2(92, 356)));
+    w.add(ControlInverterZone(
+      trapId: 'l3_p3_step3_inv',
+      position: Vector2(2936, 366),
+      size: Vector2(84, 30),
+      targetInverted: false,
+      requireGrounded: true,
+    ));
+    // Step 3 rear-ambush spike catches player if jumping backward from Step 4
+    w.add(TrapSpike(
+      trapId: 'l3_p3_step3_spike',
+      position: Vector2(2978, 396),
+      behavior: SpikeBehavior.remotePopUp,
+      remoteTriggerX: 3028.0,
+      remoteTriggerMaxX: 3104.0,
+      remoteTriggerMaxY: 348.0,
+      remoteRequireGrounded: true,
+      hideCompletelyWhenIdle: true,
+    ));
+
+    // Step 4 & Top Plateau starter: y = 344 (x: 3024..3164)
+    w.add(GroundBlock(position: Vector2(3024, 344), size: Vector2(140, 408)));
+    // Step 4 Inverter: grounded landing flips to Inverted
+    w.add(ControlInverterZone(
+      trapId: 'l3_p3_step4_inv',
+      position: Vector2(3028, 314),
+      size: Vector2(56, 30),
+      targetInverted: true,
+      requireGrounded: true,
+    ));
+    // Plateau normalizer: resets to Normal before hesitation gap!
+    w.add(ControlInverterZone(
+      trapId: 'l3_p3_plateau_norm',
+      position: Vector2(3096, 314),
+      size: Vector2(68, 30),
+      targetInverted: false,
+      requireGrounded: true,
+    ));
+
+    // Hesitation Gap on plateau (x: 3164..3468, width 304, gapWidth 86)
+    w.add(MovingGapFloor(
+      trapId: 'l3_p3_hesitation',
+      position: Vector2(3164, 344),
+      size: Vector2(304, 408),
+      mode: MovingGapMode.hesitation,
+      gapWidth: 86.0,
+      activateRoomX: 2560.0,
+      initialGapLocalX: 96.0,
+      anchorGapLocalX: 160.0,
+      proximityRangePx: 108.0,
+    ));
+
+    // Final plateau runway (x: 3468..3744, width 276)
+    w.add(GroundBlock(position: Vector2(3468, 344), size: Vector2(276, 408)));
+
+    // Surprise pop-up spike before exit portal (does not move)
+    w.add(TrapSpike(
+      trapId: 'l3_p3_surprise_spike',
+      position: Vector2(3588, 344),
+      behavior: SpikeBehavior.proximityPopUp,
+      hideCompletelyWhenIdle: true,
+      triggerDistance: 44.0,
+      jitterDuration: 0.08,
+    ));
+
+    // Exit Portal door on plateau
+    w.add(ExitPortal(position: Vector2(3698, 344)));
+
     return ChamberLoadResult(
-      spawnPosition: Vector2(144, 552),
-      exitX: 1132.0,
+      spawnPosition: Vector2(148, 552),
+      exitX: 3698.0,
     );
   }
 
   static ChamberLoadResult _buildLevel4(TrapDashGame game) {
     final w = game.world;
     // Central ceiling baffle
-    w.add(GroundBlock(position: Vector2(570, 72), size: Vector2(190, 168)));
+    w.add(GroundBlock(position: Vector2(570, 104), size: Vector2(190, 136)));
 
     // Entry floor
     w.add(GroundBlock(position: Vector2(96, 552), size: Vector2(194, 200)));
@@ -601,7 +855,7 @@ class ChamberLoader {
   static ChamberLoadResult _buildLevel5(TrapDashGame game) {
     final w = game.world;
     // Low ceiling overhang
-    w.add(GroundBlock(position: Vector2(96, 72), size: Vector2(824, 116)));
+    w.add(GroundBlock(position: Vector2(96, 104), size: Vector2(824, 84)));
 
     // Slab 1
     w.add(GroundBlock(position: Vector2(96, 552), size: Vector2(180, 200)));

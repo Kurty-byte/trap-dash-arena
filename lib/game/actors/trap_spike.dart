@@ -13,6 +13,8 @@ enum SpikeBehavior {
   slideRightOnJump,
   riseOnProximity,
   doubleSlideTrap,
+  remotePopUp,
+  oscillateTwice,
 }
 
 class TrapSpike extends PositionComponent
@@ -29,10 +31,19 @@ class TrapSpike extends PositionComponent
   final double returnSlideSpeed;
   final double riseHeight;
   final double riseSpeed;
+  final double remoteTriggerX;
+  final double remoteTriggerMaxX;
+  final double remoteTriggerMaxY;
+  final bool remoteRequireGrounded;
 
   bool isRevealed = false;
   bool isTriggered = false;
   bool isExtended = false;
+
+  bool get isOscillating =>
+      behavior == SpikeBehavior.oscillateTwice &&
+      _trapPhase >= 1 &&
+      _trapPhase <= 4;
 
   late final Vector2 _initialPosition;
   int _trapPhase = 0;
@@ -69,6 +80,10 @@ class TrapSpike extends PositionComponent
     this.returnSlideSpeed = 480.0,
     this.riseHeight = 88.0,
     this.riseSpeed = 680.0,
+    this.remoteTriggerX = 0.0,
+    this.remoteTriggerMaxX = double.infinity,
+    this.remoteTriggerMaxY = double.infinity,
+    this.remoteRequireGrounded = false,
   })  : behavior = behavior ??
             (isStatic ? SpikeBehavior.stationary : SpikeBehavior.proximityPopUp),
         hitbox = RectangleHitbox(
@@ -83,7 +98,9 @@ class TrapSpike extends PositionComponent
         ) {
     _initialPosition = position.clone();
     _jitterTimer = jitterDuration;
-    if (this.behavior != SpikeBehavior.proximityPopUp) {
+    if (this.behavior != SpikeBehavior.proximityPopUp &&
+        this.behavior != SpikeBehavior.remotePopUp &&
+        !(this.behavior == SpikeBehavior.oscillateTwice && hideCompletelyWhenIdle)) {
       isExtended = true;
     }
     add(hitbox);
@@ -237,6 +254,87 @@ class TrapSpike extends PositionComponent
           }
         }
         break;
+
+      case SpikeBehavior.remotePopUp:
+        if (!isTriggered && !isExtended) {
+          if (!player.isInDeathCycle) {
+            final inX = player.position.x >= remoteTriggerX &&
+                player.position.x <= remoteTriggerMaxX;
+            final inY = player.position.y <= remoteTriggerMaxY;
+            final groundedOk = !remoteRequireGrounded || player.isOnGround;
+            if (inX && inY && groundedOk) {
+              isTriggered = true;
+              isExtended = true;
+              game.audio.playSfx('trap_trigger.wav');
+            }
+          }
+        }
+
+        if (isTriggered && !_baitAwarded) {
+          _survivalTimer -= dt;
+          if (_survivalTimer <= 0) {
+            _baitAwarded = true;
+            game.controller.onTrapBait(trapId);
+          }
+        }
+        break;
+
+      case SpikeBehavior.oscillateTwice:
+        if (_trapPhase == 0) {
+          if (!player.isInDeathCycle &&
+              player.position.x >= _initialPosition.x - triggerDistance &&
+              player.position.x <= _initialPosition.x + triggerDistance + 32.0) {
+            isTriggered = true;
+            isExtended = true;
+            _trapPhase = 1;
+            game.audio.playSfx('trap_trigger.wav');
+          }
+        } else if (_trapPhase == 1) {
+          // Cycle 1: Sweep Left
+          final targetLeft = _initialPosition.x - slideLeftDistance;
+          if (position.x > targetLeft) {
+            position.x = max(targetLeft, position.x - slideSpeed * dt);
+          }
+          if (position.x <= targetLeft) {
+            _trapPhase = 2;
+          }
+        } else if (_trapPhase == 2) {
+          // Cycle 1: Sweep Right
+          final targetRight = _initialPosition.x + slideRightDistance;
+          if (position.x < targetRight) {
+            position.x = min(targetRight, position.x + slideSpeed * dt);
+          }
+          if (position.x >= targetRight) {
+            _trapPhase = 3;
+          }
+        } else if (_trapPhase == 3) {
+          // Cycle 2: Sweep Left
+          final targetLeft = _initialPosition.x - slideLeftDistance;
+          if (position.x > targetLeft) {
+            position.x = max(targetLeft, position.x - slideSpeed * dt);
+          }
+          if (position.x <= targetLeft) {
+            _trapPhase = 4;
+          }
+        } else if (_trapPhase == 4) {
+          // Cycle 2: Sweep Right
+          final targetRight = _initialPosition.x + slideRightDistance;
+          if (position.x < targetRight) {
+            position.x = min(targetRight, position.x + slideSpeed * dt);
+          }
+          if (position.x >= targetRight) {
+            _trapPhase = 5;
+          }
+        } else if (_trapPhase == 5) {
+          if (!_baitAwarded) {
+            _survivalTimer -= dt;
+            if (_survivalTimer <= 0) {
+              _baitAwarded = true;
+              game.controller.onTrapBait(trapId);
+            }
+          }
+        }
+        break;
     }
   }
 
@@ -252,9 +350,7 @@ class TrapSpike extends PositionComponent
 
   void retract() {
     if (behavior != SpikeBehavior.stationary) {
-      if (isTriggered) {
-        isRevealed = true;
-      }
+      isRevealed = false;
       isTriggered = false;
       position.setFrom(_initialPosition);
       _jitterTimer = jitterDuration;
@@ -263,7 +359,9 @@ class TrapSpike extends PositionComponent
       _trapPhase = 0;
       _phaseTimer = 0.0;
       _baitAwarded = false;
-      if (behavior == SpikeBehavior.proximityPopUp) {
+      if (behavior == SpikeBehavior.proximityPopUp ||
+          behavior == SpikeBehavior.remotePopUp ||
+          (behavior == SpikeBehavior.oscillateTwice && hideCompletelyWhenIdle)) {
         isExtended = false;
       } else {
         isExtended = true;
@@ -288,7 +386,6 @@ class TrapSpike extends PositionComponent
     if (hideCompletelyWhenIdle &&
         !isTriggered &&
         !isExtended &&
-        !isRevealed &&
         !GameState.instance.highContrastTells) {
       return;
     }
@@ -332,8 +429,8 @@ class TrapSpike extends PositionComponent
       }
     }
 
-    // High-contrast or revealed warning outline
-    if (isRevealed || isHighContrast) {
+    // High-contrast warning outline
+    if (isHighContrast) {
       canvas.drawRect(_warningRect, _warningPaint);
     }
 

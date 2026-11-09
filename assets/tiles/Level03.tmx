@@ -1,52 +1,187 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="40" height="23" tilewidth="32" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="25">
+<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="120" height="23" tilewidth="32" tileheight="32" infinite="0" nextlayerid="3" nextobjectid="45">
  <properties>
   <property name="levelNumber" type="int" value="3"/>
   <property name="timeLimit" type="float" value="70.0"/>
+  <property name="requiredKeys" type="int" value="0"/>
+  <property name="roomCount" type="int" value="3"/>
  </properties>
  <objectgroup id="1" name="Walls">
-  <object id="1" name="CeilingOverhang" x="96" y="72" width="924" height="128"/>
-  <object id="2" name="Floor1" x="96" y="552" width="334" height="200"/>
-  <object id="3" name="Floor2" x="526" y="552" width="264" height="200"/>
-  <object id="4" name="Floor3" x="886" y="552" width="174" height="200"/>
-  <object id="5" name="ExitAlcove" x="1060" y="464" width="124" height="288"/>
+  <object id="1" name="Passage1Roof" x="1184" y="104" width="192" height="352"/>
+  <object id="2" name="Passage2Roof" x="2464" y="104" width="192" height="352"/>
+  <object id="3" name="FloorP1Start" x="96" y="552" width="244" height="200"/>
+  <object id="4" name="Island1" x="424" y="552" width="180" height="200"/>
+  <object id="5" name="Island2" x="688" y="552" width="180" height="200"/>
+  <object id="6" name="FloorP1End" x="952" y="552" width="768" height="200"/>
+  <object id="7" name="IslandP2" x="1804" y="552" width="160" height="200"/>
+  <object id="8" name="FloorP2End" x="2048" y="552" width="700" height="200"/>
+  <object id="9" name="Step1" x="2748" y="500" width="92" height="252"/>
+  <object id="10" name="Step2" x="2840" y="448" width="92" height="304"/>
+  <object id="11" name="Step3" x="2932" y="396" width="92" height="356"/>
+  <object id="12" name="Step4PlateauStart" x="3024" y="344" width="140" height="408"/>
+  <object id="13" name="FinalPlateau" x="3468" y="344" width="276" height="408"/>
  </objectgroup>
  <objectgroup id="2" name="Objects">
-  <object id="10" name="Spawn" x="144" y="552" width="24" height="38"/>
-  <object id="11" name="FallingBlock" x="240" y="200" width="40" height="36">
-   <properties>
-    <property name="groundY" type="float" value="552.0"/>
-   </properties>
-  </object>
-  <object id="12" name="FallingBlock" x="350" y="200" width="40" height="36">
-   <properties>
-    <property name="groundY" type="float" value="552.0"/>
-   </properties>
-  </object>
-  <object id="13" name="FakeFloor" x="438" y="552" width="80" height="24"/>
-  <object id="14" name="Checkpoint" x="590" y="552" width="28" height="20">
+  <object id="14" name="Spawn" x="148" y="552" width="24" height="38"/>
+  <object id="15" name="Checkpoint" x="1312" y="552" width="28" height="20">
    <properties>
     <property name="checkpointId" type="int" value="1"/>
    </properties>
   </object>
-  <object id="15" name="Coin" x="590" y="500" width="18" height="18"/>
-  <object id="16" name="FallingBlock" x="700" y="200" width="40" height="36">
+  <object id="16" name="Checkpoint" x="2592" y="552" width="28" height="20">
    <properties>
-    <property name="groundY" type="float" value="552.0"/>
+    <property name="checkpointId" type="int" value="2"/>
    </properties>
   </object>
-  <object id="17" name="DisappearingPlatform" x="802" y="524" width="72" height="20"/>
-  <object id="18" name="FallingBlock" x="930" y="200" width="40" height="36">
+  <!-- Platform 1 Objects -->
+  <object id="17" name="ControlInverterZone" x="268" y="520" width="40" height="40">
    <properties>
-    <property name="groundY" type="float" value="552.0"/>
+    <property name="requireGrounded" type="bool" value="false"/>
+    <property name="targetInverted" type="bool" value="true"/>
+    <property name="triggerFullHeight" type="bool" value="true"/>
    </properties>
   </object>
-  <object id="19" name="ExitPortal" x="995" y="552" width="45" height="40">
+  <object id="18" name="SuddenGap" x="340" y="552" width="84" height="200">
    <properties>
-    <property name="isFakeFirst" type="bool" value="true"/>
-    <property name="realX" type="float" value="1132.0"/>
-    <property name="realY" type="float" value="464.0"/>
+    <property name="triggerLeadPx" type="float" value="76.0"/>
    </properties>
   </object>
+  <object id="19" name="ControlInverterZone" x="434" y="520" width="150" height="40">
+   <properties>
+    <property name="requireGrounded" type="bool" value="true"/>
+    <property name="targetInverted" type="bool" value="false"/>
+   </properties>
+  </object>
+  <object id="20" name="SuddenGap" x="604" y="552" width="84" height="200">
+   <properties>
+    <property name="triggerLeadPx" type="float" value="52.0"/>
+   </properties>
+  </object>
+  <object id="21" name="ControlInverterZone" x="698" y="520" width="150" height="40">
+   <properties>
+    <property name="requireGrounded" type="bool" value="true"/>
+    <property name="targetInverted" type="bool" value="true"/>
+   </properties>
+  </object>
+  <object id="22" name="SuddenGap" x="868" y="552" width="84" height="200">
+   <properties>
+    <property name="triggerLeadPx" type="float" value="52.0"/>
+   </properties>
+  </object>
+  <object id="23" name="ControlInverterZone" x="962" y="520" width="150" height="40">
+   <properties>
+    <property name="requireGrounded" type="bool" value="true"/>
+    <property name="targetInverted" type="bool" value="false"/>
+   </properties>
+  </object>
+
+  <!-- Platform 2 Objects -->
+  <object id="24" name="TrapSpike" x="1468" y="552" width="36" height="26">
+   <properties>
+    <property name="behavior" value="remotePopUp"/>
+    <property name="hideCompletelyWhenIdle" type="bool" value="true"/>
+    <property name="remoteTriggerMaxX" type="float" value="1700.0"/>
+    <property name="remoteTriggerX" type="float" value="1548.0"/>
+   </properties>
+  </object>
+  <object id="25" name="ControlInverterZone" x="1568" y="520" width="40" height="40">
+   <properties>
+    <property name="requireGrounded" type="bool" value="false"/>
+    <property name="targetInverted" type="bool" value="true"/>
+    <property name="triggerFullHeight" type="bool" value="true"/>
+   </properties>
+  </object>
+  <object id="26" name="SuddenGap" x="1720" y="552" width="84" height="200">
+   <properties>
+    <property name="triggerLeadPx" type="float" value="52.0"/>
+   </properties>
+  </object>
+  <object id="27" name="SuddenGap" x="1964" y="552" width="84" height="200">
+   <properties>
+    <property name="triggerLeadPx" type="float" value="52.0"/>
+   </properties>
+  </object>
+  <object id="28" name="ControlInverterZone" x="2100" y="520" width="120" height="40">
+   <properties>
+    <property name="requireGrounded" type="bool" value="true"/>
+    <property name="targetInverted" type="bool" value="false"/>
+   </properties>
+  </object>
+  <object id="29" name="TrapSpike" x="2376" y="552" width="36" height="26">
+   <properties>
+    <property name="behavior" value="proximityPopUp"/>
+    <property name="hideCompletelyWhenIdle" type="bool" value="true"/>
+    <property name="jitterDuration" type="float" value="0.08"/>
+    <property name="triggerDistance" type="float" value="36.0"/>
+   </properties>
+  </object>
+
+  <!-- Platform 3 Objects -->
+  <object id="30" name="ControlInverterZone" x="2668" y="520" width="50" height="40">
+   <properties>
+    <property name="requireGrounded" type="bool" value="false"/>
+    <property name="targetInverted" type="bool" value="true"/>
+    <property name="triggerFullHeight" type="bool" value="true"/>
+   </properties>
+  </object>
+  <object id="31" name="ControlInverterZone" x="2752" y="470" width="84" height="30">
+   <properties>
+    <property name="requireGrounded" type="bool" value="true"/>
+    <property name="targetInverted" type="bool" value="false"/>
+   </properties>
+  </object>
+  <object id="32" name="ControlInverterZone" x="2844" y="418" width="84" height="30">
+   <properties>
+    <property name="requireGrounded" type="bool" value="true"/>
+    <property name="targetInverted" type="bool" value="true"/>
+   </properties>
+  </object>
+  <object id="33" name="ControlInverterZone" x="2936" y="366" width="84" height="30">
+   <properties>
+    <property name="requireGrounded" type="bool" value="true"/>
+    <property name="targetInverted" type="bool" value="false"/>
+   </properties>
+  </object>
+  <object id="34" name="TrapSpike" x="2978" y="396" width="36" height="26">
+   <properties>
+    <property name="behavior" value="remotePopUp"/>
+    <property name="hideCompletelyWhenIdle" type="bool" value="true"/>
+    <property name="remoteRequireGrounded" type="bool" value="true"/>
+    <property name="remoteTriggerMaxX" type="float" value="3104.0"/>
+    <property name="remoteTriggerMaxY" type="float" value="348.0"/>
+    <property name="remoteTriggerX" type="float" value="3028.0"/>
+   </properties>
+  </object>
+  <object id="35" name="ControlInverterZone" x="3028" y="314" width="56" height="30">
+   <properties>
+    <property name="requireGrounded" type="bool" value="true"/>
+    <property name="targetInverted" type="bool" value="true"/>
+   </properties>
+  </object>
+  <object id="36" name="ControlInverterZone" x="3096" y="314" width="68" height="30">
+   <properties>
+    <property name="requireGrounded" type="bool" value="true"/>
+    <property name="targetInverted" type="bool" value="false"/>
+   </properties>
+  </object>
+  <object id="37" name="MovingGapFloor" x="3164" y="344" width="304" height="408">
+   <properties>
+    <property name="activateRoomX" type="float" value="2560.0"/>
+    <property name="anchorGapLocalX" type="float" value="160.0"/>
+    <property name="gapWidth" type="float" value="86.0"/>
+    <property name="initialGapLocalX" type="float" value="96.0"/>
+    <property name="mode" value="hesitation"/>
+    <property name="proximityRangePx" type="float" value="108.0"/>
+   </properties>
+  </object>
+  <object id="38" name="TrapSpike" x="3588" y="344" width="36" height="26">
+   <properties>
+    <property name="behavior" value="proximityPopUp"/>
+    <property name="hideCompletelyWhenIdle" type="bool" value="true"/>
+    <property name="jitterDuration" type="float" value="0.08"/>
+    <property name="triggerDistance" type="float" value="44.0"/>
+   </properties>
+  </object>
+  <object id="39" name="ExitPortal" x="3698" y="344" width="45" height="40"/>
  </objectgroup>
 </map>

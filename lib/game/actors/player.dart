@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
+import 'package:trap_dash_arena/autoload/palette.dart';
 import 'package:trap_dash_arena/game/actors/player_shard_effect.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
 
@@ -43,15 +44,33 @@ class Player extends PositionComponent
   double _coyoteTimer = 0.0;
   double _jumpBufferTimer = 0.0;
   bool get isJumpBuffered => _jumpBufferTimer > 0;
-  int _horizontalDirection = 0; // -1: left, 0: idle, 1: right
-  int get horizontalDirection => _horizontalDirection;
+  int _rawInputDirection = 0; // -1: left, 0: idle, 1: right
+  bool controlsInverted = false;
+  int get horizontalDirection =>
+      controlsInverted ? -_rawInputDirection : _rawInputDirection;
   bool _facingLeft = false;
   bool _isInvulnerable = true;
   double _invulnerableTimer = 0.5;
 
   List<Sprite>? _sprites;
+  Sprite? _invertedIndicatorSprite;
+  Sprite? get invertedIndicatorSprite => _invertedIndicatorSprite;
   int _currentFrame = 0;
   double _animTimer = 0.0;
+
+  void setControlsInverted(bool inverted) {
+    if (controlsInverted == inverted) return;
+    controlsInverted = inverted;
+    final effDir = horizontalDirection;
+    if (effDir < 0) {
+      _facingLeft = true;
+    } else if (effDir > 0) {
+      _facingLeft = false;
+    }
+    if (!isInDeathCycle && !isEnteringDoor) {
+      velocity.x = effDir * moveSpeed;
+    }
+  }
 
   final RectangleHitbox hitbox;
 
@@ -97,23 +116,53 @@ class Player extends PositionComponent
     } catch (_) {
       // Fallback for headless tests
     }
+
+    try {
+      final cachedHud = game.tryGetCachedImage('game/hud.png');
+      if (cachedHud != null) {
+        _invertedIndicatorSprite = Sprite(
+          cachedHud,
+          srcPosition: Vector2(0, 170.0),
+          srcSize: Vector2(34.0, 34.0),
+        );
+      } else {
+        final hudImage = await game.images.load('game/hud.png');
+        _invertedIndicatorSprite = Sprite(
+          hudImage,
+          srcPosition: Vector2(0, 170.0),
+          srcSize: Vector2(34.0, 34.0),
+        );
+      }
+    } catch (_) {
+      // Fallback for headless tests
+    }
   }
 
   void moveLeft() {
     if (isEnteringDoor) return;
-    _horizontalDirection = -1;
-    _facingLeft = true;
+    _rawInputDirection = -1;
+    final effDir = horizontalDirection;
+    if (effDir < 0) {
+      _facingLeft = true;
+    } else if (effDir > 0) {
+      _facingLeft = false;
+    }
   }
 
   void moveRight() {
     if (isEnteringDoor) return;
-    _horizontalDirection = 1;
-    _facingLeft = false;
+    _rawInputDirection = 1;
+    final effDir = horizontalDirection;
+    if (effDir < 0) {
+      _facingLeft = true;
+    } else if (effDir > 0) {
+      _facingLeft = false;
+    }
   }
 
   void stopMoving() {
     if (isEnteringDoor) return;
-    _horizontalDirection = 0;
+    _rawInputDirection = 0;
   }
 
   void jump() {
@@ -139,7 +188,7 @@ class Player extends PositionComponent
     _onDoorEnterComplete = onComplete;
     _doorTargetPos = doorPosition.clone();
     velocity.setZero();
-    _horizontalDirection = 0;
+    _rawInputDirection = 0;
   }
 
   @override
@@ -222,11 +271,18 @@ class Player extends PositionComponent
 
     final physicsDt = min(0.05, dt);
 
+    final effDir = horizontalDirection;
+    if (effDir < 0) {
+      _facingLeft = true;
+    } else if (effDir > 0) {
+      _facingLeft = false;
+    }
+
     // Horizontal movement
-    velocity.x = _horizontalDirection * moveSpeed;
+    velocity.x = effDir * moveSpeed;
 
     // Sprite walk animation cycle (frames 1..4 when running, frame 0 when idle)
-    if (_horizontalDirection != 0 && isOnGround) {
+    if (effDir != 0 && isOnGround) {
       _animTimer += physicsDt * 10.0;
       _currentFrame = 1 + (_animTimer.toInt() % 4);
     } else {
@@ -311,6 +367,7 @@ class Player extends PositionComponent
     isEnteringDoor = false;
     _doorAnimTimer = 0.0;
     _onDoorEnterComplete = null;
+    controlsInverted = false;
 
     final oldEffect = _activeShardEffect;
     _activeShardEffect = null;
@@ -359,6 +416,38 @@ class Player extends PositionComponent
     if (isInDeathCycle) return;
 
     super.render(canvas);
+
+    // Inverted controls visual tell above head (HUD left arrow)
+    if (controlsInverted && !isEnteringDoor) {
+      if (_invertedIndicatorSprite != null) {
+        _invertedIndicatorSprite!.render(
+          canvas,
+          position: Vector2((size.x - 20) / 2, -24),
+          size: Vector2(20, 20),
+        );
+      } else {
+        // Fallback for headless tests
+        final arrowPaint = Paint()
+          ..color = AppPalette.warningRed
+          ..strokeWidth = 2.0
+          ..style = PaintingStyle.stroke;
+        canvas.drawLine(
+          Offset(size.x / 2 + 6, -12),
+          Offset(size.x / 2 - 6, -12),
+          arrowPaint,
+        );
+        canvas.drawLine(
+          Offset(size.x / 2 - 6, -12),
+          Offset(size.x / 2 - 2, -16),
+          arrowPaint,
+        );
+        canvas.drawLine(
+          Offset(size.x / 2 - 6, -12),
+          Offset(size.x / 2 - 2, -8),
+          arrowPaint,
+        );
+      }
+    }
 
     canvas.save();
 

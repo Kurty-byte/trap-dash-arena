@@ -39,10 +39,11 @@ class LevelConfig {
     LevelConfig(
       levelNumber: 3,
       tmxFile: 'Level03.tmx',
-      goalText: 'Survive the Falling Corridor & Exit in 70s',
+      goalText: 'Survive Inverted Controls & Exit in 70s',
       timeLimit: 70.0,
       initialHearts: 4,
       requiredKeys: 0,
+      roomCount: 3,
     ),
     LevelConfig(
       levelNumber: 4,

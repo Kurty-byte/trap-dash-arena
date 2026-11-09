@@ -10,6 +10,7 @@ import 'package:trap_dash_arena/autoload/audio_manager.dart';
 import 'package:trap_dash_arena/autoload/game_state.dart';
 import 'package:trap_dash_arena/autoload/net_manager.dart';
 import 'package:trap_dash_arena/autoload/palette.dart';
+import 'package:trap_dash_arena/game/actors/control_inverter_zone.dart';
 import 'package:trap_dash_arena/game/actors/disappearing_platform.dart';
 import 'package:trap_dash_arena/game/actors/fake_floor.dart';
 import 'package:trap_dash_arena/game/actors/falling_block.dart';
@@ -65,7 +66,7 @@ class TrapDashGame extends FlameGame
         );
 
   @override
-  Color backgroundColor() => AppPalette.yellowBackground;
+  Color backgroundColor() => AppPalette.brownSolid;
 
   @override
   Future<void> onLoad() async {
@@ -83,6 +84,7 @@ class TrapDashGame extends FlameGame
         'game/button.png',
         'game/bomb.png',
         'game/teleport.png',
+        'game/hud.png',
       ]);
     } catch (_) {}
 
@@ -197,6 +199,8 @@ class TrapDashGame extends FlameGame
       } else if (child is SuddenGap) {
         child.resetToSolid();
       } else if (child is MovingGapFloor) {
+        child.resetToInitial();
+      } else if (child is ControlInverterZone) {
         child.resetToInitial();
       }
     }
