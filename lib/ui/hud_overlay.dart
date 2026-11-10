@@ -75,34 +75,69 @@ class HudOverlay extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
 
-                        // Hearts Row with high-contrast shadow
-                        ValueListenableBuilder<int>(
-                          valueListenable: controller.hearts,
-                          builder: (context, heartsVal, _) {
-                            return Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: List.generate(
-                                controller.config.initialHearts,
-                                (index) => Padding(
-                                  padding: const EdgeInsets.only(right: 3),
-                                  child: Icon(
-                                    Icons.favorite_rounded,
-                                    color: index < heartsVal
-                                        ? AppPalette.yellowBackground
-                                        : AppPalette.playerBlack.withValues(alpha: 0.35),
-                                    size: 19,
-                                    shadows: const [
-                                      Shadow(
-                                        color: AppPalette.playerBlack,
-                                        blurRadius: 2.0,
-                                        offset: Offset(1, 1),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
+                        // Hearts Row with high-contrast shadow (tap to toggle Dev Infinite Lives)
+                        GestureDetector(
+                          key: const Key('hud_dev_hearts_toggle'),
+                          onTap: () {
+                            if (_canInteract(game)) {
+                              GameState.instance.toggleDevMode();
+                            }
                           },
+                          child: ValueListenableBuilder<bool>(
+                            valueListenable: GameState.instance.devMode,
+                            builder: (context, isDev, _) {
+                              return ValueListenableBuilder<int>(
+                                valueListenable: controller.hearts,
+                                builder: (context, heartsVal, _) {
+                                  return Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ...List.generate(
+                                        controller.config.initialHearts,
+                                        (index) => Padding(
+                                          padding: const EdgeInsets.only(right: 3),
+                                          child: Icon(
+                                            Icons.favorite_rounded,
+                                            color: (isDev || index < heartsVal)
+                                                ? AppPalette.yellowBackground
+                                                : AppPalette.playerBlack.withValues(alpha: 0.35),
+                                            size: 19,
+                                            shadows: const [
+                                              Shadow(
+                                                color: AppPalette.playerBlack,
+                                                blurRadius: 2.0,
+                                                offset: Offset(1, 1),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      if (isDev)
+                                        Container(
+                                          margin: const EdgeInsets.only(left: 2),
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppPalette.playerBlack,
+                                            border: Border.all(
+                                              color: AppPalette.yellowBackground,
+                                              width: 1.0,
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'DEV ∞',
+                                            style: TextStyle(
+                                              fontFamily: 'PressStart2P',
+                                              fontSize: 8,
+                                              color: AppPalette.yellowBackground,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          ),
                         ),
 
                         // Keys count badge if keys required
@@ -260,32 +295,43 @@ class HudOverlay extends StatelessWidget {
                           const SizedBox(width: 6),
                         ],
 
-                        // Timer
-                        ValueListenableBuilder<int>(
-                          valueListenable: controller.displayTimeSeconds,
-                          builder: (context, secondsVal, _) {
+                        // Timer (hidden when dev mode has no time limit)
+                        ValueListenableBuilder<bool>(
+                          valueListenable: GameState.instance.devMode,
+                          builder: (context, isDev, _) {
+                            if (isDev) return const SizedBox.shrink();
                             return Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
-                                  Icons.timer_outlined,
-                                  color: AppPalette.yellowBackground,
-                                  size: 16,
+                                ValueListenableBuilder<int>(
+                                  valueListenable: controller.displayTimeSeconds,
+                                  builder: (context, secondsVal, _) {
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.timer_outlined,
+                                          color: AppPalette.yellowBackground,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          '${secondsVal}s',
+                                          style: const TextStyle(
+                                            fontFamily: 'PressStart2P',
+                                            fontSize: 11,
+                                            color: AppPalette.yellowBackground,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '${secondsVal}s',
-                                  style: const TextStyle(
-                                    fontFamily: 'PressStart2P',
-                                    fontSize: 11,
-                                    color: AppPalette.yellowBackground,
-                                  ),
-                                ),
+                                const SizedBox(width: 8),
                               ],
                             );
                           },
                         ),
-                        const SizedBox(width: 8),
 
                         // Score
                         ValueListenableBuilder<int>(

@@ -16,8 +16,10 @@ import 'package:trap_dash_arena/game/actors/fake_floor.dart';
 import 'package:trap_dash_arena/game/actors/falling_block.dart';
 import 'package:trap_dash_arena/game/actors/moving_gap_floor.dart';
 import 'package:trap_dash_arena/game/actors/player.dart';
+import 'package:trap_dash_arena/game/actors/portal_gauntlet_controller.dart';
 import 'package:trap_dash_arena/game/actors/sudden_gap.dart';
 import 'package:trap_dash_arena/game/actors/trap_spike.dart';
+import 'package:trap_dash_arena/game/actors/warp_portal.dart';
 import 'package:trap_dash_arena/game/chamber_loader.dart';
 import 'package:trap_dash_arena/game/level_config.dart';
 import 'package:trap_dash_arena/game/level_controller.dart';
@@ -202,6 +204,10 @@ class TrapDashGame extends FlameGame
         child.resetToInitial();
       } else if (child is ControlInverterZone) {
         child.resetToInitial();
+      } else if (child is WarpPortal) {
+        child.resetToInitial();
+      } else if (child is PortalGauntletController) {
+        child.resetToInitial();
       }
     }
 
@@ -330,6 +336,11 @@ class TrapDashGame extends FlameGame
     KeyEvent event,
     Set<LogicalKeyboardKey> keysPressed,
   ) {
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.f1) {
+      GameState.instance.toggleDevMode();
+      return KeyEventResult.handled;
+    }
+
     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.escape) {
       if (overlays.isActive('PauseOverlay')) {
         resumeGame();

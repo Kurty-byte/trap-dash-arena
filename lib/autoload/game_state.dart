@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class GameState {
@@ -6,6 +7,7 @@ class GameState {
   GameState._();
 
   static const int totalLevels = 5;
+  final ValueNotifier<bool> devMode = ValueNotifier<bool>(false);
   int unlockedLevel = 1;
   Map<int, int> bestStars = {};
   int currentLevel = 1;
@@ -15,7 +17,17 @@ class GameState {
   String playerNickname = 'Runner';
   Map<String, dynamic> lastResult = {};
 
-  bool isUnlocked(int level) => level <= unlockedLevel;
+  bool get isDevMode => devMode.value;
+
+  void setDevMode(bool enabled) {
+    devMode.value = enabled;
+  }
+
+  void toggleDevMode() {
+    devMode.value = !devMode.value;
+  }
+
+  bool isUnlocked(int level) => devMode.value || level <= unlockedLevel;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();

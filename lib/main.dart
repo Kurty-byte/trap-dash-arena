@@ -6,6 +6,9 @@ import 'package:trap_dash_arena/autoload/game_state.dart';
 import 'package:trap_dash_arena/ui/title_screen.dart';
 import 'package:trap_dash_arena/ui/widgets/arcade_page_route.dart';
 
+/// Development trigger: when true, lives are infinite and all levels are unlocked.
+const bool kDevMode = true;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -18,8 +21,9 @@ void main() async {
   // Immersive sticky fullscreen mode for mobile arcade gameplay
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-  // Initialize persistence singleton
+  // Initialize persistence singleton and apply development trigger
   await GameState.instance.init();
+  GameState.instance.setDevMode(kDevMode);
 
   // Mount UI immediately so TitleScreen renders without waiting on native audio drivers
   runApp(const TrapDashApp());

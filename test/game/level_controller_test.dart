@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:trap_dash_arena/autoload/game_state.dart';
 import 'package:trap_dash_arena/game/level_config.dart';
 import 'package:trap_dash_arena/game/level_controller.dart';
 
@@ -144,6 +145,29 @@ void main() {
       expect(controller.hearts.value, equals(0));
       expect(controller.isGameOver.value, isTrue);
       expect(controller.isLevelCleared.value, isFalse);
+    });
+
+    test('Dev mode keeps lives infinite and never triggers heart loss game over', () {
+      GameState.instance.setDevMode(true);
+      addTearDown(() => GameState.instance.setDevMode(false));
+
+      for (int i = 0; i < 20; i++) {
+        controller.onPlayerHurt();
+      }
+
+      expect(controller.hearts.value, equals(5));
+      expect(controller.isGameOver.value, isFalse);
+    });
+
+    test('Dev mode stops timer countdown and never triggers timer expiry game over', () {
+      GameState.instance.setDevMode(true);
+      addTearDown(() => GameState.instance.setDevMode(false));
+
+      controller.update(999.0);
+
+      expect(controller.timeLeft.value, equals(90.0));
+      expect(controller.displayTimeSeconds.value, equals(90));
+      expect(controller.isGameOver.value, isFalse);
     });
 
     test('Timer expiry triggers game over (loss)', () {
