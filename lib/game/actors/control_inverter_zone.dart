@@ -51,7 +51,7 @@ class ControlInverterZone extends PositionComponent
     super.update(dt);
 
     final player = game.player;
-    if (!player.isInDeathCycle && !isTriggered) {
+    if (!player.isInDeathCycle && !player.isWarping && !isTriggered) {
       final inX = player.position.x >= position.x &&
           player.position.x <= position.x + size.x;
       final inY = triggerFullHeight

@@ -88,7 +88,7 @@ class MovingGapFloor extends PositionComponent
 
     if (mode == MovingGapMode.chase) {
       if (!isGapOpen) {
-        if (!player.isInDeathCycle && player.position.x >= triggerPlayerX) {
+        if (!player.isInDeathCycle && !player.isWarping && player.position.x >= triggerPlayerX) {
           isGapOpen = true;
           gapLocalX = 0.0;
           game.audio.playSfx('trap_trigger.wav');
@@ -98,7 +98,7 @@ class MovingGapFloor extends PositionComponent
         }
       } else {
         if (!_isChasing) {
-          if (!player.isInDeathCycle && player.position.x >= chaseStartPlayerX) {
+          if (!player.isInDeathCycle && !player.isWarping && player.position.x >= chaseStartPlayerX) {
             _isChasing = true;
           }
         }
@@ -118,13 +118,13 @@ class MovingGapFloor extends PositionComponent
     } else {
       // Hesitation mode
       if (!isGapOpen) {
-        if (!player.isInDeathCycle && player.position.x >= activateRoomX) {
+        if (!player.isInDeathCycle && !player.isWarping && player.position.x >= activateRoomX) {
           isGapOpen = true;
           gapLocalX = initialGapLocalX;
         }
       }
 
-      if (isGapOpen && !player.isInDeathCycle) {
+      if (isGapOpen && !player.isInDeathCycle && !player.isWarping) {
         final gapWorldLeft = position.x + gapLocalX;
         final gapWorldRight = gapWorldLeft + gapWidth;
         final inProximity = player.position.x >= (gapWorldLeft - proximityRangePx) &&

@@ -12,6 +12,8 @@ class FallingBlock extends PositionComponent
   final String trapId;
   final double groundY;
   final Vector2 initialPosition;
+  final bool manualTriggerOnly;
+  final bool Function()? shouldHoldFall;
 
   bool isRevealed = false;
   bool isTriggered = false;
@@ -25,7 +27,10 @@ class FallingBlock extends PositionComponent
   double _survivalTimer = 0.50;
   Sprite? _bombSprite;
 
-  late final RectangleHitbox hitbox;
+  late final RectangleHitbox hitbox = RectangleHitbox(
+    size: size,
+    collisionType: CollisionType.passive,
+  );
   late final Rect _rect = size.toRect();
   late final Offset _lineP1 = Offset(0, size.y - 1);
   late final Offset _lineP2 = Offset(size.x, size.y - 1);
@@ -42,6 +47,8 @@ class FallingBlock extends PositionComponent
     required Vector2 position,
     required this.groundY,
     Vector2? size,
+    this.manualTriggerOnly = false,
+    this.shouldHoldFall,
   })  : initialPosition = position.clone(),
         super(
           position: position,
@@ -52,11 +59,9 @@ class FallingBlock extends PositionComponent
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    hitbox = RectangleHitbox(
-      size: size,
-      collisionType: CollisionType.passive,
-    );
-    add(hitbox);
+    if (!contains(hitbox)) {
+      add(hitbox);
+    }
 
     try {
       final cached = game.tryGetCachedSprite('game/bomb.png');
@@ -74,10 +79,10 @@ class FallingBlock extends PositionComponent
   void update(double dt) {
     super.update(dt);
 
-    if (!isTriggered && !hasLanded) {
+    if (!manualTriggerOnly && !isTriggered && !hasLanded) {
       // Proximity sensor: triggers if player enters within 64px horizontally beneath block
       final player = game.player;
-      if (!player.isInDeathCycle) {
+      if (!player.isInDeathCycle && !player.isWarping) {
         final dx = (player.position.x - (position.x + size.x / 2)).abs();
         if (dx <= 64.0 && player.position.y >= position.y && player.position.y <= groundY + 50) {
           triggerFall();
@@ -86,6 +91,10 @@ class FallingBlock extends PositionComponent
     }
 
     if (isTriggered && !isFalling && !hasLanded) {
+      if (shouldHoldFall?.call() == true) {
+        _shakeOffsetX = sin(_telegraphTimer * 60) * 3.0;
+        return;
+      }
       _telegraphTimer -= dt;
       _shakeOffsetX = sin(_telegraphTimer * 60) * 3.0;
 
@@ -101,6 +110,16 @@ class FallingBlock extends PositionComponent
 
       if (position.y + size.y >= groundY) {
         position.y = groundY - size.y;
+        try {
+          final player = game.player;
+          final overlapsX = player.position.x >= position.x - 10.0 &&
+              player.position.x <= position.x + size.x + 10.0;
+          final overlapsY = player.position.y > position.y &&
+              player.position.y - player.size.y < position.y + size.y;
+          if (overlapsX && overlapsY) {
+            player.takeDamage();
+          }
+        } catch (_) {}
         isFalling = false;
         hasLanded = true;
         game.audio.playSfx('trap_trigger.wav');
@@ -166,6 +185,7 @@ class FallingBlock extends PositionComponent
 
   @override
   void render(Canvas canvas) {
+    if (manualTriggerOnly && !isTriggered) return;
     super.render(canvas);
 
     final isHighContrast = GameState.instance.highContrastTells;

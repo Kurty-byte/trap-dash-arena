@@ -48,10 +48,11 @@ class LevelConfig {
     LevelConfig(
       levelNumber: 4,
       tmxFile: 'Level04.tmx',
-      goalText: 'Dodge the Moving Saws & Exit in 60s',
+      goalText: 'Master the Deceptive Warps & Exit in 60s',
       timeLimit: 60.0,
       initialHearts: 3,
       requiredKeys: 0,
+      roomCount: 3,
     ),
     LevelConfig(
       levelNumber: 5,

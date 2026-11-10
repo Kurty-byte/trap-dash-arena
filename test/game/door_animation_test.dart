@@ -1,5 +1,6 @@
 import 'package:flame/components.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trap_dash_arena/game/actors/exit_portal.dart';
 import 'package:trap_dash_arena/game/actors/player.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
@@ -12,6 +13,7 @@ void main() {
     late Player player;
 
     setUp(() async {
+      SharedPreferences.setMockInitialValues({});
       game = TrapDashGame(initialLevelNumber: 1);
       game.images.prefix = 'assets/';
       await game.onLoad();

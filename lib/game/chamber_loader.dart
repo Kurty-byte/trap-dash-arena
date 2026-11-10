@@ -14,9 +14,11 @@ import 'package:trap_dash_arena/game/actors/hint_arrow.dart';
 import 'package:trap_dash_arena/game/actors/moving_gap_floor.dart';
 import 'package:trap_dash_arena/game/actors/moving_saw.dart';
 import 'package:trap_dash_arena/game/actors/pickup_item.dart';
+import 'package:trap_dash_arena/game/actors/portal_gauntlet_controller.dart';
 import 'package:trap_dash_arena/game/actors/reverse_spring.dart';
 import 'package:trap_dash_arena/game/actors/sudden_gap.dart';
 import 'package:trap_dash_arena/game/actors/trap_spike.dart';
+import 'package:trap_dash_arena/game/actors/warp_portal.dart';
 import 'package:trap_dash_arena/game/level_config.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
 
@@ -333,6 +335,36 @@ class ChamberLoader {
               isFakeFirst: isFake,
               realTargetPosition: realTarget,
             ));
+            break;
+          case 'WarpPortal':
+            final targetX = obj.properties.getValue<double>('targetX') ?? pos.x;
+            final targetY = obj.properties.getValue<double>('targetY') ?? pos.y;
+            final invert = obj.properties.getValue<bool>('setControlsInverted');
+            final secTargetX = obj.properties.getValue<double>('secondTargetX');
+            final secTargetY = obj.properties.getValue<double>('secondTargetY');
+            final secInvert = obj.properties.getValue<bool>('secondSetControlsInverted');
+            final pass1Shift = obj.properties.getValue<double>('pass1JumpShiftX') ?? 0.0;
+            final pass2Shift = obj.properties.getValue<double>('pass2JumpShiftX') ?? 0.0;
+            final fleeX = obj.properties.getValue<double>('fleeTargetX');
+            final fleeY = obj.properties.getValue<double>('fleeTargetY');
+            final fleeSpd = obj.properties.getValue<double>('fleeSpeed') ?? 480.0;
+            final fleeTrigX = obj.properties.getValue<double>('fleeTriggerX') ?? 1764.0;
+            game.world.add(WarpPortal(
+              trapId: 'wp_${obj.id}',
+              position: pos,
+              targetPosition: Vector2(targetX, targetY),
+              setControlsInvertedOnWarp: invert,
+              secondTargetPosition: secTargetX != null && secTargetY != null ? Vector2(secTargetX, secTargetY) : null,
+              secondSetControlsInvertedOnWarp: secInvert,
+              pass1JumpShiftX: pass1Shift,
+              pass2JumpShiftX: pass2Shift,
+              fleeTargetPosition: fleeX != null && fleeY != null ? Vector2(fleeX, fleeY) : null,
+              fleeSpeed: fleeSpd,
+              fleeTriggerX: fleeTrigX,
+            ));
+            break;
+          case 'PortalGauntletController':
+            game.world.add(PortalGauntletController());
             break;
         }
       }
@@ -802,53 +834,150 @@ class ChamberLoader {
 
   static ChamberLoadResult _buildLevel4(TrapDashGame game) {
     final w = game.world;
-    // Central ceiling baffle
-    w.add(GroundBlock(position: Vector2(570, 104), size: Vector2(190, 136)));
 
-    // Entry floor
-    w.add(GroundBlock(position: Vector2(96, 552), size: Vector2(194, 200)));
-    w.add(MovingSaw(
-      pathStart: Vector2(195, 534),
-      pathEnd: Vector2(270, 534),
-      speed: 100,
+    // Partition upper wall roofs between rooms leaving 96px high passage tunnels (y: 456..552)
+    w.add(GroundBlock(position: Vector2(1184, 104), size: Vector2(192, 352)));
+    w.add(GroundBlock(position: Vector2(2464, 104), size: Vector2(192, 352)));
+
+    // ==========================================
+    // Room 1 / Platform 1 (x: 96..1184): 4 Slender High Pillars & Betrayal Warps
+    // ==========================================
+    // Pillar 1: x = 100..180 (w: 80, h: 332, top y: 420)
+    w.add(GroundBlock(position: Vector2(100, 420), size: Vector2(80, 332)));
+    final p1Spike = TrapSpike(
+      trapId: 'l4_p1_pillar1_spike',
+      position: Vector2(140, 420),
+      behavior: SpikeBehavior.proximityPopUp,
+      hideCompletelyWhenIdle: true,
+      triggerDistance: 0.0, // Activated by Warp 1 or betrayal
+    );
+    w.add(p1Spike);
+
+    // Gap 1: x = 180..360 (w: 180)
+    // Warp 1: at bottom of Gap 1, warps to Pillar 2 and raises spike on Pillar 1
+    w.add(WarpPortal(
+      trapId: 'l4_p1_warp1',
+      position: Vector2(270, 624),
+      targetPosition: Vector2(400, 420),
+      postWarpSpikeToActivate: p1Spike,
     ));
 
-    // Gap 1
-    w.add(DisappearingPlatform(position: Vector2(320, 520), size: Vector2(80, 20)));
-    w.add(PickupItem(type: PickupType.coin, position: Vector2(360, 470)));
+    // Pillar 2: x = 360..440 (w: 80, h: 332, top y: 420)
+    w.add(GroundBlock(position: Vector2(360, 420), size: Vector2(80, 332)));
+    final p2Spike = TrapSpike(
+      trapId: 'l4_p1_pillar2_spike',
+      position: Vector2(400, 420),
+      behavior: SpikeBehavior.proximityPopUp,
+      hideCompletelyWhenIdle: true,
+      triggerDistance: 0.0, // Activated by Warp 2
+    );
+    w.add(p2Spike);
 
-    // Pillar 1
-    w.add(GroundBlock(position: Vector2(430, 552), size: Vector2(140, 200)));
-    w.add(CheckpointFlag(checkpointId: 1, position: Vector2(490, 552)));
-
-    // Gap 2
-    w.add(DisappearingPlatform(position: Vector2(595, 496), size: Vector2(72, 20)));
-    w.add(MovingSaw(
-      pathStart: Vector2(712, 420),
-      pathEnd: Vector2(712, 560),
-      speed: 110,
-    ));
-    w.add(PickupItem(type: PickupType.coin, position: Vector2(631, 444)));
-
-    // Pillar 2
-    w.add(GroundBlock(position: Vector2(760, 520), size: Vector2(150, 232)));
-    w.add(MovingSaw(
-      pathStart: Vector2(785, 502),
-      pathEnd: Vector2(885, 502),
-      speed: 120,
+    // Gap 2: x = 440..620 (w: 180)
+    // Warp 2: at bottom of Gap 2, warps to Pillar 3 and raises spike on Pillar 2
+    w.add(WarpPortal(
+      trapId: 'l4_p1_warp2',
+      position: Vector2(530, 624),
+      targetPosition: Vector2(660, 420),
+      postWarpSpikeToActivate: p2Spike,
     ));
 
-    // Gap 3
-    w.add(DisappearingPlatform(position: Vector2(938, 520), size: Vector2(72, 20)));
-    w.add(PickupItem(type: PickupType.coin, position: Vector2(974, 468)));
+    // Pillar 3: x = 620..700 (w: 80, h: 332, top y: 420)
+    w.add(GroundBlock(position: Vector2(620, 420), size: Vector2(80, 332)));
 
-    // Exit floor
-    w.add(GroundBlock(position: Vector2(1040, 552), size: Vector2(144, 200)));
-    w.add(ExitPortal(position: Vector2(1128, 552)));
+    // Gap 3: x = 700..790 (w: 90, jumpable gap!)
+    // Betrayal Warp 3: warps player back to Pillar 1 directly onto the extended spike!
+    w.add(WarpPortal(
+      trapId: 'l4_p1_warp3_trap',
+      position: Vector2(745, 624),
+      targetPosition: Vector2(140, 420),
+    ));
+
+    // Pillar 4: x = 790..870 (w: 80, h: 332, top y: 420)
+    w.add(GroundBlock(position: Vector2(790, 420), size: Vector2(80, 332)));
+
+    // Step down transition into Passage 1:
+    w.add(GroundBlock(position: Vector2(870, 486), size: Vector2(90, 266)));
+    w.add(GroundBlock(position: Vector2(960, 552), size: Vector2(416, 200)));
+    w.add(CheckpointFlag(checkpointId: 1, position: Vector2(1312, 552)));
+
+    // ==========================================
+    // Room 2 / Platform 2 (x: 1376..2464): Void Bridge & Upper Platform
+    // ==========================================
+    // Left Bridge: x = 1376..1696 (w: 320, h: 36) - lower part is void pit!
+    w.add(GroundBlock(position: Vector2(1376, 552), size: Vector2(320, 36)));
+
+    // Bridge Gap: x = 1696..1844 (w: 148)
+    // Multi-pass Bridge Warp:
+    // Pass 1: player jumps off left bridge, warp shifts left -38px; entering teleports to Right Bridge (1910, 552)
+    // Pass 2: player jumps off right bridge, warp shifts right +38px; entering teleports to Upper Platform (1740, 340) and inverts controls!
+    w.add(WarpPortal(
+      trapId: 'l4_p2_bridge_warp',
+      position: Vector2(1770, 616),
+      targetPosition: Vector2(1910, 552),
+      pass1JumpShiftX: -38.0,
+      secondTargetPosition: Vector2(1740, 340),
+      secondSetControlsInvertedOnWarp: true,
+      pass2JumpShiftX: 38.0,
+    ));
+
+    // Right Bridge: x = 1844..2100 (w: 256, h: 36)
+    w.add(GroundBlock(position: Vector2(1844, 552), size: Vector2(256, 36)));
+
+    // Right Blocker Wall: x = 2100..2132 (y = 340..588, h: 248) prevents rightward escape
+    w.add(GroundBlock(position: Vector2(2100, 340), size: Vector2(32, 248)));
+
+    // Close-proximity spike on Right Bridge (x = 1976)
+    w.add(TrapSpike(
+      trapId: 'l4_p2_bridge_spike',
+      position: Vector2(1976, 552),
+      behavior: SpikeBehavior.proximityPopUp,
+      triggerDistance: 36.0,
+      jitterDuration: 0.08,
+      hideCompletelyWhenIdle: true,
+    ));
+
+    // Upper Inner Platform: x = 1640..1900 (w = 260, h = 28)
+    w.add(GroundBlock(position: Vector2(1640, 340), size: Vector2(260, 28)));
+
+    // Close-proximity spike on Upper Platform (x = 1828)
+    w.add(TrapSpike(
+      trapId: 'l4_p2_upper_spike',
+      position: Vector2(1828, 340),
+      behavior: SpikeBehavior.proximityPopUp,
+      triggerDistance: 36.0,
+      jitterDuration: 0.08,
+      hideCompletelyWhenIdle: true,
+    ));
+
+    // Deceptive Fleeing Warp: starts at right (1868, 316), instantly moves to left (1668, 316) upon approaching right
+    // Entering teleports to Passage 2 floor (2360, 552) and restores controls to normal!
+    w.add(WarpPortal(
+      trapId: 'l4_p2_upper_warp',
+      position: Vector2(1868, 316),
+      fleeTargetPosition: Vector2(1668, 316),
+      fleeTriggerX: 1764.0,
+      targetPosition: Vector2(2360, 552),
+      setControlsInvertedOnWarp: false,
+    ));
+
+    // Passage 2 floor runway (x = 2300..2656, ends right at Room 3 entrance)
+    w.add(GroundBlock(position: Vector2(2300, 552), size: Vector2(356, 200)));
+    w.add(CheckpointFlag(checkpointId: 2, position: Vector2(2592, 552)));
+
+    // ==========================================
+    // Room 3 / Platform 3 (x: 2656..3744): Portal Gauntlet & Exit Ledge
+    // ==========================================
+    // Gauntlet controller managing compact square box, paired portals, and on-demand wrong-choice hazards
+    w.add(PortalGauntletController());
+
+    // Solid Exit Ledge (x: 3556..3668, y: 400): front ledge (3556..3598) hosts Step 1 doorTrapSpike, rear hosts ExitPortal
+    w.add(GroundBlock(position: Vector2(3556, 400), size: Vector2(112, 36)));
+    w.add(ExitPortal(position: Vector2(3620, 400)));
 
     return ChamberLoadResult(
-      spawnPosition: Vector2(144, 552),
-      exitX: 1128.0,
+      spawnPosition: Vector2(140, 420),
+      exitX: 3620.0,
     );
   }
 

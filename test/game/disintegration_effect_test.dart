@@ -205,6 +205,70 @@ void main() {
       effect.update(0.10);
       expect(completeCount, equals(1));
     });
+
+    test('startWarp triggers two-phase slow shard transition without invulnerability', () async {
+      player.position = Vector2(200, 500);
+      final dest = Vector2(600, 400);
+
+      // Trigger warp
+      player.startWarp(dest, invertControls: true, landOnGround: true);
+
+      expect(player.position.x, equals(600));
+      expect(player.position.y, equals(400));
+      expect(player.isOnGround, isTrue);
+      expect(player.controlsInverted, isTrue);
+      expect(player.isWarpDisintegrating, isTrue);
+      expect(player.isWarpReintegrating, isFalse);
+      expect(player.isWarping, isTrue);
+      expect(player.hitbox.collisionType, equals(CollisionType.inactive));
+
+      // Disintegration shard effect spawned at origin (200, 500)
+      final shardEffects = game.world.children.whereType<PlayerShardEffect>().toList();
+      expect(shardEffects.length, equals(1));
+      expect(shardEffects.first.mode, equals(ShardEffectMode.disintegrate));
+      expect(shardEffects.first.position.x, equals(200));
+      expect(shardEffects.first.position.y, equals(500));
+      expect(shardEffects.first.duration, equals(Player.warpDisintegrateDuration));
+      expect(Player.warpDisintegrateDuration, equals(0.35));
+      expect(Player.warpReintegrateDuration, equals(0.35));
+
+      // Advance through disintegration (0.20s of 0.35s)
+      player.update(0.20);
+      expect(player.isWarpDisintegrating, isTrue);
+      expect(player.isWarpReintegrating, isFalse);
+
+      // Advance to phase 2: reintegration (total 0.40s >= 0.35s)
+      player.update(0.20);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(player.isWarpDisintegrating, isFalse);
+      expect(player.isWarpReintegrating, isTrue);
+      expect(player.isWarping, isTrue);
+
+      // Reintegration effect is at destination (600, 400)
+      final reShards = game.world.children.whereType<PlayerShardEffect>().toList();
+      expect(reShards.length, equals(1));
+      expect(reShards.first.mode, equals(ShardEffectMode.reintegrate));
+      expect(reShards.first.position.x, equals(600));
+      expect(reShards.first.position.y, equals(400));
+
+      // Jump input in final 0.10s is buffered (0.27s into 0.35s leaves 0.08s)
+      player.update(0.27);
+      expect(player.isWarpReintegrating, isTrue);
+      player.jump();
+      expect(player.isJumpBuffered, isTrue);
+
+      // Warp finishes
+      player.update(0.10);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(player.isWarping, isFalse);
+      expect(player.isWarpReintegrating, isFalse);
+      expect(player.hitbox.collisionType, equals(CollisionType.active));
+
+      // Cleaned up shard effects
+      expect(game.world.children.whereType<PlayerShardEffect>().isEmpty, isTrue);
+    });
   });
 
   group('RespawnOverlay Widget Tests', () {

@@ -39,6 +39,7 @@ class TrapSpike extends PositionComponent
   bool isRevealed = false;
   bool isTriggered = false;
   bool isExtended = false;
+  bool isActive;
 
   bool get isOscillating =>
       behavior == SpikeBehavior.oscillateTwice &&
@@ -84,6 +85,7 @@ class TrapSpike extends PositionComponent
     this.remoteTriggerMaxX = double.infinity,
     this.remoteTriggerMaxY = double.infinity,
     this.remoteRequireGrounded = false,
+    this.isActive = true,
   })  : behavior = behavior ??
             (isStatic ? SpikeBehavior.stationary : SpikeBehavior.proximityPopUp),
         hitbox = RectangleHitbox(
@@ -125,6 +127,7 @@ class TrapSpike extends PositionComponent
   @override
   void update(double dt) {
     super.update(dt);
+    if (!isActive) return;
     final player = game.player;
 
     switch (behavior) {
@@ -133,7 +136,7 @@ class TrapSpike extends PositionComponent
 
       case SpikeBehavior.proximityPopUp:
         if (!isTriggered && !isExtended) {
-          if (!player.isInDeathCycle) {
+          if (!player.isInDeathCycle && !player.isWarping && triggerDistance > 0.0) {
             if (player.position.distanceToSquared(position) <=
                 triggerDistance * triggerDistance) {
               triggerJitter();
@@ -162,6 +165,7 @@ class TrapSpike extends PositionComponent
       case SpikeBehavior.slideRightOnJump:
         if (!isTriggered) {
           if (!player.isInDeathCycle &&
+              !player.isWarping &&
               !player.isOnGround &&
               player.position.x >= _initialPosition.x - 56.0 &&
               player.position.x <= _initialPosition.x + 36.0 &&
@@ -188,6 +192,7 @@ class TrapSpike extends PositionComponent
       case SpikeBehavior.riseOnProximity:
         if (!isTriggered) {
           if (!player.isInDeathCycle &&
+              !player.isWarping &&
               (player.position.x - _initialPosition.x).abs() <= triggerDistance) {
             isTriggered = true;
             game.audio.playSfx('trap_trigger.wav');
@@ -211,6 +216,7 @@ class TrapSpike extends PositionComponent
       case SpikeBehavior.doubleSlideTrap:
         if (_trapPhase == 0) {
           if (!player.isInDeathCycle &&
+              !player.isWarping &&
               (player.position.x - _initialPosition.x).abs() <= triggerDistance) {
             isTriggered = true;
             _trapPhase = 1;
@@ -228,6 +234,7 @@ class TrapSpike extends PositionComponent
         } else if (_trapPhase == 2) {
           // Waiting for player to land on the left
           if (!player.isInDeathCycle &&
+              !player.isWarping &&
               player.isOnGround &&
               player.position.x < position.x - 24.0) {
             _phaseTimer += dt;
@@ -257,7 +264,7 @@ class TrapSpike extends PositionComponent
 
       case SpikeBehavior.remotePopUp:
         if (!isTriggered && !isExtended) {
-          if (!player.isInDeathCycle) {
+          if (!player.isInDeathCycle && !player.isWarping) {
             final inX = player.position.x >= remoteTriggerX &&
                 player.position.x <= remoteTriggerMaxX;
             final inY = player.position.y <= remoteTriggerMaxY;
@@ -282,6 +289,7 @@ class TrapSpike extends PositionComponent
       case SpikeBehavior.oscillateTwice:
         if (_trapPhase == 0) {
           if (!player.isInDeathCycle &&
+              !player.isWarping &&
               player.position.x >= _initialPosition.x - triggerDistance &&
               player.position.x <= _initialPosition.x + triggerDistance + 32.0) {
             isTriggered = true;
@@ -375,14 +383,16 @@ class TrapSpike extends PositionComponent
     PositionComponent other,
   ) {
     super.onCollision(intersectionPoints, other);
+    if (!isActive) return;
 
-    if (other is Player && isExtended) {
+    if (other is Player && isExtended && !other.isWarping) {
       other.takeDamage();
     }
   }
 
   @override
   void render(Canvas canvas) {
+    if (!isActive) return;
     if (hideCompletelyWhenIdle &&
         !isTriggered &&
         !isExtended &&

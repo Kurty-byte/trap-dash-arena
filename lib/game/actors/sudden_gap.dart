@@ -57,7 +57,7 @@ class SuddenGap extends PositionComponent
 
     if (!isTriggered) {
       final player = game.player;
-      if (!player.isInDeathCycle) {
+      if (!player.isInDeathCycle && !player.isWarping) {
         final inX = player.position.x >= position.x - triggerLeadPx &&
             player.position.x <= position.x + size.x + 16.0;
         final inY = (player.position.y - position.y).abs() <= 140.0;

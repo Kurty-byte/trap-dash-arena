@@ -19,6 +19,8 @@ class Player extends PositionComponent
 
   static const double disintegrateDuration = 0.40;
   static const double reintegrateDuration = 0.38;
+  static const double warpDisintegrateDuration = 0.35;
+  static const double warpReintegrateDuration = 0.35;
 
   final Vector2 velocity = Vector2.zero();
   bool isOnGround = false;
@@ -28,6 +30,10 @@ class Player extends PositionComponent
   bool isAwaitingRespawn = false;
   bool isReintegrating = false;
   bool isDead = false;
+
+  bool isWarpDisintegrating = false;
+  bool isWarpReintegrating = false;
+  bool get isWarping => isWarpDisintegrating || isWarpReintegrating;
 
   bool get isInDeathCycle =>
       isDisintegrating || isAwaitingRespawn || isReintegrating || isDead;
@@ -40,6 +46,10 @@ class Player extends PositionComponent
   double _deathCycleTimer = 0.0;
   List<ShardTrajectory>? _lastDeathBurst;
   PlayerShardEffect? _activeShardEffect;
+
+  double _warpTimer = 0.0;
+  List<ShardTrajectory>? _warpShards;
+  PlayerShardEffect? _activeWarpShardEffect;
 
   double _coyoteTimer = 0.0;
   double _jumpBufferTimer = 0.0;
@@ -67,7 +77,7 @@ class Player extends PositionComponent
     } else if (effDir > 0) {
       _facingLeft = false;
     }
-    if (!isInDeathCycle && !isEnteringDoor) {
+    if (!isInDeathCycle && !isEnteringDoor && !isWarping) {
       velocity.x = effDir * moveSpeed;
     }
   }
@@ -173,12 +183,63 @@ class Player extends PositionComponent
       }
       return;
     }
-    if (isDisintegrating || isAwaitingRespawn || isDead) return;
+    if (isWarpReintegrating) {
+      if (_warpTimer <= jumpBufferDuration) {
+        _jumpBufferTimer = jumpBufferDuration;
+      }
+      return;
+    }
+    if (isDisintegrating || isAwaitingRespawn || isDead || isWarpDisintegrating) return;
     _jumpBufferTimer = jumpBufferDuration;
   }
 
   void cutJump() {
     // Fixed jump height: upward velocity is preserved on jump release.
+  }
+
+  void startWarp(
+    Vector2 targetPosition, {
+    bool? invertControls,
+    bool landOnGround = false,
+  }) {
+    if (isInDeathCycle || isEnteringDoor) return;
+
+    final oldWarpEffect = _activeWarpShardEffect;
+    _activeWarpShardEffect = null;
+    if (oldWarpEffect != null) {
+      Future.microtask(() {
+        oldWarpEffect.removeFromParent();
+      });
+    }
+
+    final originPos = position.clone();
+    position.setFrom(targetPosition);
+    velocity.setZero();
+    _coyoteTimer = 0.0;
+    _jumpBufferTimer = 0.0;
+    if (landOnGround) {
+      isOnGround = true;
+    }
+
+    if (invertControls != null) {
+      setControlsInverted(invertControls);
+    }
+
+    isWarpDisintegrating = true;
+    isWarpReintegrating = false;
+    _warpTimer = warpDisintegrateDuration;
+    hitbox.collisionType = CollisionType.inactive;
+    _isInvulnerable = false;
+    _invulnerableTimer = 0.0;
+
+    _warpShards = ShardTrajectory.generate(facingLeft: _facingLeft);
+    _activeWarpShardEffect = PlayerShardEffect(
+      position: originPos,
+      shards: _warpShards!,
+      mode: ShardEffectMode.disintegrate,
+      duration: warpDisintegrateDuration,
+    );
+    game.world.add(_activeWarpShardEffect!);
   }
 
   void enterDoor(Vector2 doorPosition, {required VoidCallback onComplete}) {
@@ -194,6 +255,68 @@ class Player extends PositionComponent
   @override
   void update(double dt) {
     super.update(dt);
+
+    if (isWarpDisintegrating) {
+      _warpTimer -= dt;
+      if (_warpTimer <= 0) {
+        final excessDt = -_warpTimer;
+        isWarpDisintegrating = false;
+        final oldEffect = _activeWarpShardEffect;
+        _activeWarpShardEffect = null;
+        if (oldEffect != null) {
+          Future.microtask(() {
+            oldEffect.removeFromParent();
+          });
+        }
+
+        isWarpReintegrating = true;
+        _warpTimer = warpReintegrateDuration - excessDt;
+        final shards = _warpShards ?? ShardTrajectory.generate(facingLeft: _facingLeft);
+        _activeWarpShardEffect = PlayerShardEffect(
+          position: position.clone(),
+          shards: shards,
+          mode: ShardEffectMode.reintegrate,
+          duration: warpReintegrateDuration,
+        );
+        game.world.add(_activeWarpShardEffect!);
+
+        if (_warpTimer <= 0) {
+          isWarpReintegrating = false;
+          final reEffect = _activeWarpShardEffect;
+          _activeWarpShardEffect = null;
+          if (reEffect != null) {
+            Future.microtask(() {
+              reEffect.removeFromParent();
+            });
+          }
+          hitbox.collisionType = CollisionType.active;
+          _isInvulnerable = false;
+          _invulnerableTimer = 0.0;
+        }
+      }
+      return;
+    }
+
+    if (isWarpReintegrating) {
+      _warpTimer -= dt;
+      if (_activeWarpShardEffect != null) {
+        _activeWarpShardEffect!.position.setFrom(position);
+      }
+      if (_warpTimer <= 0) {
+        isWarpReintegrating = false;
+        final oldEffect = _activeWarpShardEffect;
+        _activeWarpShardEffect = null;
+        if (oldEffect != null) {
+          Future.microtask(() {
+            oldEffect.removeFromParent();
+          });
+        }
+        hitbox.collisionType = CollisionType.active;
+        _isInvulnerable = false;
+        _invulnerableTimer = 0.0;
+      }
+      return;
+    }
 
     if (isEnteringDoor) {
       _doorAnimTimer -= dt;
@@ -332,6 +455,16 @@ class Player extends PositionComponent
     }
     if (_isInvulnerable && !ignoreInvulnerability) return;
 
+    isWarpDisintegrating = false;
+    isWarpReintegrating = false;
+    final warpEffect = _activeWarpShardEffect;
+    _activeWarpShardEffect = null;
+    if (warpEffect != null) {
+      Future.microtask(() {
+        warpEffect.removeFromParent();
+      });
+    }
+
     isDisintegrating = true;
     isAwaitingRespawn = false;
     isReintegrating = false;
@@ -368,6 +501,16 @@ class Player extends PositionComponent
     _doorAnimTimer = 0.0;
     _onDoorEnterComplete = null;
     controlsInverted = false;
+
+    isWarpDisintegrating = false;
+    isWarpReintegrating = false;
+    final warpEffect = _activeWarpShardEffect;
+    _activeWarpShardEffect = null;
+    if (warpEffect != null) {
+      Future.microtask(() {
+        warpEffect.removeFromParent();
+      });
+    }
 
     final oldEffect = _activeShardEffect;
     _activeShardEffect = null;
@@ -413,7 +556,7 @@ class Player extends PositionComponent
 
   @override
   void render(Canvas canvas) {
-    if (isInDeathCycle) return;
+    if (isInDeathCycle || isWarping) return;
 
     super.render(canvas);
 

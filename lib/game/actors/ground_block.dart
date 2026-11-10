@@ -6,9 +6,12 @@ import 'package:trap_dash_arena/autoload/palette.dart';
 import 'package:trap_dash_arena/game/actors/player.dart';
 
 class GroundBlock extends PositionComponent with CollisionCallbacks {
+  bool isActive;
+
   GroundBlock({
     required Vector2 position,
     required Vector2 size,
+    this.isActive = true,
   }) : super(
           position: position,
           size: size,
@@ -22,6 +25,7 @@ class GroundBlock extends PositionComponent with CollisionCallbacks {
     PositionComponent other,
   ) {
     super.onCollision(intersectionPoints, other);
+    if (!isActive) return;
 
     if (other is Player) {
       resolvePlayerBlockCollision(
@@ -91,6 +95,7 @@ class GroundBlock extends PositionComponent with CollisionCallbacks {
 
   @override
   void render(Canvas canvas) {
+    if (!isActive) return;
     super.render(canvas);
 
     // Monolithic flat rust brown block with subpixel margin to prevent hairline seams
