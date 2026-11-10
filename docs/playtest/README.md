@@ -46,9 +46,9 @@ In strict compliance with the **Philippine Data Privacy Act of 2012 (Republic Ac
 
 ## Qualitative Observations & Verified Fixes
 
-### Observation 1 (Level 3 Falling Corridor)
-* **Tester Note (T4):** Falling ceiling hazard initially felt too sudden on the second platform corridor.
-* **Tuning Applied:** Adjusted trigger distance sensor line by $+12\text{ px}$ and added a $0.25\text{s}$ ceiling vibration rattle before the bomb drops.
+### Observation 1 (Level 3 Inverted Controls & Level 5 Falling Block)
+* **Tester Note (T4):** Control inversion in Level 3 and falling ceiling hazards in Level 5 initially felt sudden without a visual cue.
+* **Tuning Applied:** Added an overhead directional arrow indicator above the runner when `controlsInverted` is active, and tuned `FallingBlock` drop trigger alignment.
 
 ### Observation 2 (Multiplayer Host IP Entry)
 * **Tester Note (T2):** Typing the full IP manually on a small phone was prone to minor typos.

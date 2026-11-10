@@ -1,206 +1,199 @@
 # Product Requirements Document (PRD): Trap Dash Arena
 **Course:** ITSD 85 – Special Topics in Software Development  
 **Project Type:** Mobile Game with Level Progression and Offline/Online Multiplayer  
-**Target Platform:** Android (Primary APK) / iOS (Compatible)  
+**Target Platform:** Android (Primary APK) / iOS & Desktop (Compatible)  
 **Engine & Stack:** Flutter + Flame Engine (BSD/MIT Open-Source Stack)  
-**Orientation & Resolution:** Landscape ($1280\times720$ logical viewport)
+**Orientation & Resolution:** Fixed Landscape ($1280\times720$ logical viewport)
 
 ---
 
 ## 1. Executive Summary & One-Page GDD (Phase 1 / Checkpoint 1 Ready)
 
-> *Note: Subsections 1.1 through 1.11 directly mirror the mandatory `docs/GDD.md` template from Step 1.2 of the lab manual so you can copy this section directly into your repository for Week 1 approval.*
+> *Note: Subsections 1.1 through 1.11 directly mirror `docs/GDD.md` and reflect the final implemented architecture of Trap Dash Arena.*
 
 ### 1.1 Pitch
-*Trap Dash Arena* is a deceptive 2D precision action-platformer where players must navigate five increasingly treacherous trap-filled dungeons—either solo offline or in a frantic $2\text{--}5$ player online score-rush—to reach the exit portal before their time or lives run out.
+*Trap Dash Arena* is a deceptive 2D precision action-platformer inspired by *Level Devil* and *Trap Adventure 2* where players navigate five increasingly treacherous trap-filled dungeons—either solo offline or in a frantic $2\text{--}5$ player local Wi-Fi score-rush—to reach the exit portal before their time or lives run out.
 
 ### 1.2 Genre and Target Players
 * **Genre:** 2D Deceptive Trap Platformer / Competitive Score-Rush Arcade.
 * **Target Players:** Ages $15\text{--}25$; casual-to-midcore mobile gamers who enjoy the humor and surprise of *Trap Adventure 2* and *Level Devil*, paired with bite-sized competitive multiplayer races with classmates.
 
 ### 1.3 Core Mechanic & Touch Controls
-* **Core Loop (Every $2\text{--}4$ Seconds):** The player runs, jumps, baits out deceptive environmental traps (hidden spikes, crumbling tiles, sudden ceiling drops), triggers mid-stage checkpoints, and collects bonus coins on the way to the exit portal.
-* **Touch Controls (Fixed Landscape):**
-  * **Left Thumb:** Dual on-screen directional buttons (`Move Left`, `Move Right`) positioned in the bottom-left safe zone, minimum size $120\times120\text{ px}$ ($\approx 9\text{ mm}$).
-  * **Right Thumb:** Large `Jump` button (supports variable jump height based on hold duration) in the bottom-right safe zone.
+* **Core Loop (Every $2\text{--}4$ Seconds):** The player runs across enclosed chambers, jumps over sudden or moving floor gaps, baits deceptive environmental traps (multi-behavior spikes, control inverter zones, betrayal warp portals, crumbling floors, ceiling drops, patrol saws), triggers mid-stage checkpoints, and enters the exit portal.
+* **Touch Controls (`TouchControlsOverlay`, Fixed Landscape):**
+  * **Left Thumb:** Dual on-screen wireframe chevron pads (`Move Left`, `Move Right`) positioned in the bottom-left safe zone, hit target $148\times124\text{ px}$ ($\ge 120\times120\text{ px}$ requirement).
+  * **Right Thumb:** Large wireframe pentagon `Jump` pad in the bottom-right safe zone, hit target $156\times128\text{ px}$, paired with $0.10\text{s}$ coyote time, $0.10\text{s}$ jump buffering, and asymmetric rise/fall gravity.
 
 ### 1.4 Goal, Win Condition, and Lose Condition
-* **Level Goal:** Explicitly displayed on the HUD banner at the start of each level (e.g., *"Reach the Exit Portal within $60\text{s}$ before losing all $5$ Hearts"*).
-* **Win Condition:** Touch the `ExitPortal` hitbox while $t_{\text{left}} > 0$ and $\text{Hearts} \ge 1$. Triggers the Result Screen, awards $1\text{--}3$ stars, unlocks level $n+1$, and saves to device storage.
-* **Lose Condition (Offline):** Either $\text{Hearts} = 0$ (after hitting traps $5$ times) or $t_{\text{left}} \le 0.0\text{s}$. Triggers the Result Screen (`Try Again`) with `Retry` and `Menu` buttons (`Next` is disabled).
-* **Win/Lose Condition (Online $2\text{--}5$ Players):** All players compete on the same seeded trap stage simultaneously. The winner is the first player to reach the `Target Score` (or the player with the highest score when a player crosses the Exit Portal / the $60\text{s}$ match timer expires), adjudicated strictly by the Host device (Option A) or Nakama Server (Option B).
+* **Level Goal:** Explicitly displayed on the top-center `HudOverlay` banner throughout each level alongside room progression indicator squares.
+* **Win Condition:** Touch the `ExitPortal` hitbox while $t_{\text{left}} > 0$ and $\text{Hearts} \ge 1$ (and required keys collected). Triggers the `Player.enterDoor` animation and `ResultOverlay` (`ResultScreen`), awards $1\text{--}3$ stars, unlocks level $n+1$ in Offline Mode, and saves to device storage via `SharedPreferences`.
+* **Lose Condition (Offline):** Either $\text{Hearts} = 0$ or $t_{\text{left}} \le 0.0\text{s}$. Triggers `ResultOverlay` (`"TRY AGAIN"`) with `RETRY` and `MENU` buttons (`NEXT` is hidden).
+* **Win/Lose Condition (Online $2\text{--}5$ Players):** All players compete on the same selected level simultaneously. Clients stream live `score_event` and `player_finished` payloads; when all active players finish or are eliminated, the Host device adjudicates the winner with the highest deterministic score and broadcasts `announce_winner`.
 
 ### 1.5 Level Plan (Difficulty Curve)
 
-| Level No. | Explicit HUD Goal Text | What is New or Harder (Mechanics & Traps) | Time / Life Limit |
-| :--- | :--- | :--- | :--- |
-| **Level 1** | *"Reach the Exit Portal in $90\text{s}$ (Watch for cracked tiles!)"* | **Tutorial & Basics:** Static spikes, $2$ visibly cracked crumbling floor tiles, generous checkpoint halfway, first-time hint arrows. | $90\text{s}$ / $5$ Hearts |
-| **Level 2** | *"Collect $5$ Keys & Reach the Exit in $75\text{s}$"* | **Pop-Up Spikes:** Introduces proximity-triggered floor spikes (with a $0.35\text{s}$ shake telegraph) and required key pickups. | $75\text{s}$ / $5$ Hearts |
-| **Level 3** | *"Survive the Falling Corridor & Exit in $70\text{s}$"* | **Gravity Traps:** Introduces dropping ceiling blocks and a fake exit portal that jumps to the real platform when approached. | $70\text{s}$ / $4$ Hearts |
-| **Level 4** | *"Dodge the Moving Saws & Exit in $60\text{s}$"* | **Dynamic Hazards:** Combines patrol sawblades, disappearing platforms, and pop-up spikes with tighter jump windows. | $60\text{s}$ / $3$ Hearts |
-| **Level 5** | *"Conquer the Master Gauntlet in $60\text{s}$"* | **Full Trap Adventure Chaos:** High-density gauntlet combining fake floors, ceiling drops, moving saws, and reverse-gravity springs. | $60\text{s}$ / $3$ Hearts |
+Levels $1\text{--}4$ are 3-room enclosed dungeon chambers ($3 \times 1280\text{ px}$ wide with smooth exponential room-by-room camera panning and passage checkpoints). Level $5$ is a 1-room high-density master gauntlet. `ChamberLoader` loads Tiled `.tmx` maps (`Level01.tmx`–`Level05.tmx`) with deterministic programmatic chamber fallbacks (`_buildLevel1`–`_buildLevel5`).
+
+| Level No. | Rooms | Explicit HUD Goal Text (`LevelConfig`) | What is New or Harder (Mechanics & Traps) | Time / Life Limit |
+| :--- | :---: | :--- | :--- | :--- |
+| **Level 1** | $3$ | *"Cross 3 Platforms & Reach the Exit in 90s"* | **Deceptive Floor Gaps:** Introduces `SuddenGap` floor openings, `MovingGapFloor` (`chase` mode & anti-second-guessing `hesitation` mode), and $2$ passage `CheckpointFlag`s. | $90\text{s}$ / $5$ Hearts |
+| **Level 2** | $3$ | *"Outsmart the Deceptive Spikes & Exit in 75s"* | **Multi-Behavior Spikes:** Introduces `TrapSpike` variants (`stationary`, `slideRightOnJump`, `proximityPopUp`, `riseOnProximity`, `doubleSlideTrap`) paired with chasing and hesitation floor gaps and $2$ checkpoints. | $75\text{s}$ / $5$ Hearts |
+| **Level 3** | $3$ | *"Survive Inverted Controls & Exit in 70s"* | **Control Inversion & Ambushes:** Introduces `ControlInverterZone` (walk & grounded triggers with overhead arrow indicator), `SuddenGap` islands, rear-ambush `remotePopUp` spikes, a 4-step inverted staircase, and a plateau hesitation gap. | $70\text{s}$ / $4$ Hearts |
+| **Level 4** | $3$ | *"Master the Deceptive Warps & Exit in 60s"* | **Betrayal Warps & Portal Gauntlet:** Slender pillars with spike-arming `WarpPortal`s, multi-pass shifting bridge warp, fleeing upper warp, and Room 3's 5-step binary `PortalGauntletController` (`[left, right, right, left, right]`). | $60\text{s}$ / $3$ Hearts |
+| **Level 5** | $1$ | *"Conquer the Master Gauntlet in 60s"* | **Master Gauntlet:** High-density chamber combining `ReverseSpring`, `FakeFloor` ($0.30\text{s}$ crumble shake), `FallingBlock` ceiling drops, `MovingSaw` blades, `DisappearingPlatform`, bonus `PickupItem` coins, and $1$ mid checkpoint. | $60\text{s}$ / $3$ Hearts |
 
 ### 1.6 Unlocking and Star Rating Rules
-* **Level Unlocking Rule:** Level $1$ is unlocked by default. Level $n+1$ remains locked (displaying a padlock icon and disabled button state) until Level $n$ is cleared in Offline Mode.
-* **Star Calculation Formula:** Upon clearing a level, stars ($1\text{--}3$) are awarded using remaining time ($t_{\text{left}}$ relative to $t_{\text{limit}}$) and remaining hearts ($H_{\text{left}}$):
-  * **$3$ Stars:** Cleared with $t_{\text{left}} > 0.50 \times t_{\text{limit}}$ AND $H_{\text{left}} \ge 3$.
+* **Level Unlocking Rule:** Level $1$ is unlocked by default. Level $n+1$ remains locked (displaying a padlock icon and disabled button state in `LevelSelectScreen`) until Level $n$ is cleared in Offline Mode.
+* **Star Calculation Formula (`LevelController.calculateStars`):** Upon clearing a level, stars ($1\text{--}3$) are awarded using remaining time ($t_{\text{left}}$ relative to $t_{\text{limit}}$) and remaining hearts ($H_{\text{left}}$):
+  * **$3$ Stars:** Cleared with $t_{\text{left}} > 0.50 \times t_{\text{limit}}$ AND $H_{\text{left}} \ge \min(3, \text{initialHearts} - 1)$.
   * **$2$ Stars:** Cleared with $t_{\text{left}} > 0.25 \times t_{\text{limit}}$ OR $H_{\text{left}} \ge 2$.
   * **$1$ Star:** Level cleared under any other valid condition.
 
 ### 1.7 Offline Mode
 * **Primary Mode (Solo Campaign):** Playable $100\%$ in Airplane Mode with zero network calls. Players progress through Levels $1\text{--}5$, earning stars and unlocking stages locally.
-* **Bonus Offline AI Option (Pace-Bot Ghost):** Players can toggle a "Race vs. AI Bot" option in Offline Mode, where a simulated AI score counter (`SimpleAI`) increments its score at level-scaled intervals ($\text{delay} = \max(0.8, 3.0 - 0.4 \times (\text{level} - 1))$), challenging the player to beat the bot's score before the level ends.
+* **Bonus Offline AI Option (`SimpleAI` Pace-Bot Ghost):** Players can toggle **Offline AI Rival Bot** in `SettingsScreen`, spawning a translucent ghost runner (`BOT` badge) that traverses the chamber and increments its score (`+35 pts` per step) at level-scaled intervals ($\text{delay} = \max(0.8, 3.0 - 0.4 \times (\text{level} - 1))$).
 
 ### 1.8 Online Mode ($2\text{--}5$ Player Score-Based Competition)
-* **Match Type:** Real-time competitive score-rush across $2\text{ to }5$ devices over local Wi-Fi/Hotspot (Option A: Local WebSocket Host & Join) or Internet Matchmaking (Option B Bonus: Nakama Server).
-* **How Competition Works:** Every player runs the chosen level simultaneously on their own screen. Instead of heavy physics collisions between players, players compete on a live **Match Scoreboard** updated in real time:
+* **Match Type:** Real-time competitive score-rush across $2\text{ to }5$ devices over local Wi-Fi/Hotspot (`LocalWsTransport` / `NetManager` on port `7777`).
+* **How Competition Works:** Every player runs the chosen level simultaneously on their own screen. Players compete on a live **Match Scoreboard** rendered in `HudOverlay`:
   * Reaching a Checkpoint: $+100\text{ pts}$
-  * Collecting a Trap Coin: $+50\text{ pts}$
+  * Collecting a Coin/Key: $+50\text{ pts}$
   * Triggering/Surviving a Trap Bait: $+25\text{ pts}$
-  * Dying to a Trap (Respawns at last checkpoint): $-25\text{ pts}$
+  * Dying to a Trap or Pit (Respawns at last checkpoint): $-25\text{ pts}$ (base score floored at $0$)
   * Reaching the Exit Portal: $+300\text{ pts} + (\lceil t_{\text{left}} \rceil \times 10\text{ pts})$
-* **Network Payload Sent:** Lightweight JSON event packets (`start_match`, `score_event`, `player_progress_x`, `announce_winner`, `peer_disconnected`). Online matches do not overwrite offline level unlocks.
+* **Network Payload Sent:** Lightweight JSON event packets (`join_lobby`, `lobby_state`, `start_match`, `score_event`, `player_finished`, `announce_winner`, `peer_disconnected`). Online matches do not overwrite offline level unlocks.
 
-### 1.9 Screens List
-1. `TitleScreen` (Game logo, "Tap to Start")
-2. `MainMenuScreen` (Play, Settings, Credits)
-3. `ModeSelectScreen` (Play Offline, Play Online, Back)
-4. `LevelSelectScreen` (3-column grid for Levels $1\text{--}5$, lock icons, star counts, Back)
-5. `LobbyScreen` (Player name input, Host Game button showing local IP, IP text field + Join Game button with $5\text{s}$ timeout, connected player list for $2\text{--}5$ players, Host "Start Match" button)
-6. `GameScreen` (Flame `GameWidget` canvas + Flutter HUD overlay for Goal text, Timer, Hearts, Live Scoreboard, and Pause button)
-7. `PauseMenuOverlay` (Resume, Restart, Sound On/Off toggle, Quit to Menu)
-8. `ResultScreen` (Win/Lose banner, Star rating, Score breakdown, Leaderboard table for Online mode, Retry / Next / Menu buttons)
-9. `SettingsScreen` & `CreditsScreen` (Sound/Music toggle, Trap Visual Cue accessibility toggle, full CC0/Open-Source asset attribution)
+### 1.9 Screens & Overlays List
+1. `TitleScreen` (Game logo, hazard background, `"TAP ANYWHERE TO START"`)
+2. `MainMenuScreen` (`PLAY`, `SETTINGS`, `CREDITS`)
+3. `ModeSelectScreen` (`PLAY OFFLINE`, `PLAY ONLINE`, back button)
+4. `LevelSelectScreen` (5-level grid with padlock icons, $1\text{--}3$ star indicators, back button)
+5. `LobbyScreen` (Player nickname display, `HOST GAME` showing local IP + one-tap copy, IP input + `JOIN GAME` with $5\text{s}$ timeout, connected player list for $2\text{--}5$ players, Host level selector & `START MATCH` button)
+6. `GameScreen` + `HudOverlay` + `TouchControlsOverlay` (Flame `GameWidget` canvas + top bezel HUD for Pause/Restart, Hearts/Dev toggle, Room progress squares, Goal text banner, Pace-Bot score, Timer, Score, and live Online Scoreboard)
+7. `RespawnOverlay` (`"YOU DIED"` modal showing remaining hearts and `RESPAWN` button / `Space` prompt)
+8. `PauseOverlay` (`RESUME`, `RESTART`, `SOUND: ON/OFF` toggle, `QUIT TO MENU`)
+9. `ResultOverlay` (`ResultScreen`: Win/Lose banner, animated Star rating, Score/Time/Hearts breakdown, Online Leaderboard table, `RETRY` / `NEXT` / `MENU` buttons)
+10. `SettingsScreen` & `CreditsScreen` (Sound Mute toggle, High-Contrast Trap Tells toggle, Offline AI Bot toggle, Player Nickname editor, Reset Progress confirmation, and full CC0/Open-Source asset attribution)
 
 ### 1.10 Art and Sound Style + Asset Sources and Licenses
-* **Visual Style:** Clean, high-contrast 16-bit pixel art so traps and player hitboxes are unmistakable on small phone screens.
+* **Visual Style:** *Level Devil*-inspired minimalist monotone palette (`AppPalette`: `#FFE478` chamber yellow, `#B8693D` solid brown walls, `#080402` black player silhouette, `#FF1744` high-contrast warning red) so traps and player hitboxes are unmistakable on mobile screens.
 * **Asset Sources & Licenses (100% Free & Open Source):**
-  * **Graphics:** *Kenney.nl Pixel Platformer Pack* (CC0 1.0 Universal) and custom sprites created in *LibreSprite* (GPLv2).
-  * **Audio:** Retro sound effects (`jump.wav`, `trap_trigger.wav`, `hurt.wav`, `win.wav`, `unlock.wav`) generated in *jsfxr* (CC0); background chiptune music (`.ogg`) from *OpenGameArt.org* (CC0 / CC-BY 4.0, credited in `docs/CREDITS.md`).
-  * **Typography:** *Press Start 2P* and *Atkinson Hyperlegible* via *Google Fonts* (SIL Open Font License, minimum $28\text{ px}$ body text equivalent).
+  * **Graphics:** Minimalist monotone sprites (`assets/game/`), HUD icons by Thomas / Mewily (`mewily.itch.io`), *Kenney.nl Pixel Platformer Pack* (CC0 1.0 Universal), and custom sprites created in *LibreSprite* (GPLv2).
+  * **Audio:** Retro sound effects (`jump.wav`, `trap_trigger.wav`, `hurt.wav`, `win.wav`, `unlock.wav`) generated in *jsfxr* (CC0); background chiptune music (`bgm.mp3`) from *OpenGameArt.org* (CC0 / CC-BY, credited in `docs/CREDITS.md`).
+  * **Typography:** *Press Start 2P* and *Atkinson Hyperlegible* (SIL Open Font License).
 
-### 1.11 Risks and Simpler Fallbacks
-* **Risk 1 (Playtest Frustration):** *Trap Adventure 2*-style invisible traps could cause external playtesters to take $>4$ attempts on Levels $1\text{--}3$ or rate fairness $<3.5/5.0$.
-  * *Mitigation/Fallback:* Give players $5$ Hearts and mid-level checkpoints per attempt, and include subtle visual tells (cracked pixels, $0.35\text{s}$ rumble before spikes pop up) in Levels $1\text{--}3$.
+### 1.11 Risks and Mitigations
+* **Risk 1 (Playtest Frustration):** Unforgiving traps could cause playtesters to take $>4$ formal attempts on early levels.
+  * *Mitigation:* Give players $3\text{--}5$ Hearts and $2$ mid-level checkpoints per attempt (`RespawnOverlay`), plus visual/audio tells and a High-Contrast Trap Tells accessibility toggle.
 * **Risk 2 (Multiplayer Desync with 2–5 Players):** Syncing $5$ physics bodies at $60\text{ FPS}$ over mobile hotspot can lag.
-  * *Mitigation/Fallback:* Sync only discrete score events (`score_event`) and normalized horizontal progress ($0\%\text{--}100\%$ progress bar at the top of the HUD) rather than frame-by-frame physics bodies.
+  * *Mitigation:* Sync discrete score events (`score_event`), normalized horizontal progress ($0.0\text{--}1.0$), and finish notifications (`player_finished`) rather than frame-by-frame physics bodies.
 
 ---
 
-## 2. Requirements Mapping for Lab Compliance
+## 2. Lab Requirements Mapping (ITSD 85 Compliance)
 
 This matrix maps every mandatory requirement (`R1`–`R10`), bonus item, and rubric criterion from the **ITSD 85 Lab Manual** to its exact design and technical implementation in *Trap Dash Arena*.
 
 | Lab Req ID | Lab Requirement Description | How *Trap Dash Arena* Complies (Flutter + Flame Implementation) | Acceptance / Verification Method |
 | :--- | :--- | :--- | :--- |
-| **R1** | At least $5$ levels, each harder or different from the last (more enemies, less time, new mechanic, bigger map). | $5$ distinct Tiled map files (`Level01.tmx` to `Level05.tmx`). Progression introduces new trap classes per stage (Crumbling Tiles $\rightarrow$ Proximity Spikes $\rightarrow$ Falling Ceilings $\rightarrow$ Moving Saws $\rightarrow$ Combined Gauntlet) while shrinking the timer from $90\text{s}$ to $60\text{s}$ and Hearts from $5$ to $3$. | Instructor plays Levels $1\text{--}3$ live; demo video showcases Levels $4\text{--}5$. |
-| **R2** | Clear goal per level shown to the player (e.g., *"Collect 10 stars in 60 seconds"*). | `HudOverlay` displays a prominent top-center banner on level start and throughout gameplay reading `levelConfig.goalText` (e.g., *"Collect 5 Keys & Reach the Exit in 75s"*). | Goal text visibly rendered on the HUD as soon as any level starts. |
-| **R3** | Win and lose conditions with a result screen (stars, score or time) and Retry / Next / Menu buttons. | `endLevel(bool won)` transitions to `ResultScreen`. Shows `"Level Cleared!"` or `"Try Again"`, $0\text{--}3$ animated stars, final score/time, and `Retry`, `Next` (disabled on loss or Level $5$), and `Menu` buttons. | Purposefully lose all hearts on a trap to show Lose Result screen; clear the stage to show Win Result screen and `Next` button. |
-| **R4** | Level unlocking: level $n+1$ stays locked until level $n$ is cleared. | `GameState.isUnlocked(level)` checks `level <= unlockedLevel`. In `LevelSelectScreen`, levels $> \text{unlockedLevel}$ render a padlock icon and set `onPressed: null` (disabled). | Open `LevelSelectScreen` on fresh install: Level $1$ is open, Levels $2\text{--}5$ show lock icons and cannot be tapped. |
-| **R5** | Progress is saved on the device and survives closing the app. | `GameState.completeLevel()` persists `unlocked_level` and `best_stars` immediately to device flash storage via Flutter's `SharedPreferences` (`user://` equivalent). | Clear Level $2$, force-close the app from Android Recents, reopen: Level $3$ remains unlocked with saved stars. |
-| **R6** | Offline mode playable in airplane mode (solo, versus computer, or two players on one device). | Selecting `Play Offline` sets `GameState.mode = "offline"` and loads local assets and `SharedPreferences` with zero network dependencies. Includes both Solo Campaign and optional `SimpleAI` Pace-Bot mode (for maximum rubric credit). | Enable Airplane Mode on the phone, play Offline Mode, clear a level, verify saving and zero network errors. |
-| **R7** | Online mode where two players on two devices play the same match in real time or turn by turn. | Supports **$2\text{ to }5$ players** in a real-time score-based match. Option A uses Dart's `HttpServer` + `WebSocket` on port `7777` (`MAX_CLIENTS = 4`). Host broadcasts level number and random seed; clients send live score events; Host decides the winner. | Connect $2$ (up to $5$) phones on the same Wi-Fi/hotspot, run a full match, and verify live score updates and unified winner screen. |
-| **R8** | Mode selection on the main menu (Offline/Online) and a clear message when the online server cannot be reached. | `ModeSelectScreen` presents large `Play Offline` and `Play Online` buttons. `NetManager.joinGame()` uses a $5\text{-second}$ connection timeout and `try/catch` socket handler; if Wi-Fi is off or host IP is unreachable, an error dialog displays `"Cannot reach host. Check that you are on the same Wi-Fi."` and returns safely to Lobby/Mode Select. | Turn off Wi-Fi, tap `Play Online` $\rightarrow$ `Join`: game displays the friendly error modal with zero crash or freeze. |
-| **R9** | Runs on a real phone (Android APK or iOS build), in one fixed orientation, with touch controls. | Built as a native Android APK (`com.itsd85.<teamname>.trapdash`), locked to `DeviceOrientation.landscapeLeft` / `landscapeRight` ($1280\times720$), with multi-touch `Listener` buttons for Left, Right, and Jump. | Installed on $2+$ physical Android phones; documented in the Phase 7 Phone Test Matrix. |
-| **R10** | Basic polish: title screen, pause menu, sound on/off option, readable text on small screens. | Full screen flow implemented; in-level `PauseMenuOverlay` pauses the Flame engine (`game.pauseEngine()`); global audio mute saved in `GameState`; fonts $\ge 28\text{ px}$ equivalent; Android system back gesture handled via `PopScope`; `CREDITS.md` and in-game Credits screen included. | Verified against the Phase 6 & Demo checklist. |
-| **Bonus** | Star ratings ($1\text{--}3$), tutorial hints, accessibility options, player names/leaderboard, Option B (Nakama). | Includes $1\text{--}3$ star calculation, Level $1$ tutorial signposts, "High-Contrast Trap Tells" accessibility toggle, custom player nicknames on the $2\text{--}5$ player scoreboard, and modular `NakamaService` support. | Up to $+10$ bonus points on the Lab Work Rubric. |
+| **R1** | At least $5$ levels, each harder or different from the last (more enemies, less time, new mechanic, bigger map). | $5$ distinct Tiled maps (`Level01.tmx`–`Level05.tmx`) and programmatic builders (`_buildLevel1`–`_buildLevel5` in `ChamberLoader`). Progression introduces new trap classes per stage (Sudden/Moving Floor Gaps $\rightarrow$ Multi-Behavior Spikes $\rightarrow$ Control Inverter Zones $\rightarrow$ Betrayal Warp Portals & 5-Step Gauntlet $\rightarrow$ Combined Master Gauntlet) while shrinking the timer from $90\text{s}$ to $60\text{s}$ and Hearts from $5$ to $3$. | Instructor plays Levels $1\text{--}3$ live; demo video and unit tests (`level1_dungeon_test.dart`–`level4_dungeon_test.dart`) verify chamber progression. |
+| **R2** | Clear goal per level shown to the player (e.g., *"Collect 10 stars in 60 seconds"*). | `HudOverlay` displays a prominent top-center banner throughout gameplay reading `controller.config.goalText` (e.g., *"Cross 3 Platforms & Reach the Exit in 90s"*) beneath room progression indicator squares. | Goal text visibly rendered on the HUD as soon as any level starts. |
+| **R3** | Win and lose conditions with a result screen (stars, score or time) and Retry / Next / Menu buttons. | `LevelController.endLevel(bool won)` pauses the engine and shows `ResultOverlay` (`ResultScreen`). Displays `"LEVEL CLEARED!"` or `"TRY AGAIN"`, $0\text{--}3$ stars, score/time/hearts breakdown, and `RETRY`, `NEXT` (shown only on win for Levels $1\text{--}4$), and `MENU` buttons. | Lose all hearts on a trap to show Lose Result screen; clear the stage to show Win Result screen and `NEXT` button. |
+| **R4** | Level unlocking: level $n+1$ stays locked until level $n$ is cleared. | `GameState.isUnlocked(level)` checks `level <= unlockedLevel`. In `LevelSelectScreen`, levels $> \text{unlockedLevel}$ render a padlock icon and disable tap navigation (`onTap: null`). | Open `LevelSelectScreen` with `kDevMode = false`: Level $1$ is open, Levels $2\text{--}5$ show lock icons and cannot be started. |
+| **R5** | Progress is saved on the device and survives closing the app. | `GameState.completeLevel()` persists `unlocked_level` and JSON-encoded `best_stars` immediately to device flash storage via Flutter's `SharedPreferences`. | Clear Level $1$, force-close the app from Android Recents, reopen: Level $2$ remains unlocked with saved stars. |
+| **R6** | Offline mode playable in airplane mode (solo, versus computer, or two players on one device). | Selecting `PLAY OFFLINE` sets `GameState.mode = 'offline'` and loads local assets and `SharedPreferences` with zero network dependencies. Includes both Solo Campaign and optional `SimpleAI` Pace-Bot ghost runner mode. | Enable Airplane Mode on the phone, play Offline Mode, clear a level, verify saving and zero network errors. |
+| **R7** | Online mode where two players on two devices play the same match in real time or turn by turn. | Supports **$2\text{ to }5$ players** in a real-time score-based match via `NetManager` and `LocalWsTransport` (`HttpServer` + `WebSocket` on port `7777`, `maxClients = 4`). Host broadcasts level and seed; clients stream live `score_event` updates; Host adjudicates the winner (`announce_winner`). | Connect $2\text{--}5$ phones on the same Wi-Fi/hotspot, run a full match, and verify live HUD leaderboard updates and unified winner screen. |
+| **R8** | Mode selection on the main menu (Offline/Online) and a clear message when the online server cannot be reached. | `ModeSelectScreen` presents `PLAY OFFLINE` and `PLAY ONLINE` buttons. `NetManager.joinGame()` enforces a $5\text{-second}$ connection timeout and `try/catch` socket handler; if Wi-Fi is off or host IP is unreachable, `LobbyScreen` displays an `ArcadeDialog` with `"Cannot reach host. Check that you are on the same Wi-Fi."` and stays responsive. | Turn off Wi-Fi, tap `PLAY ONLINE` $\rightarrow$ `JOIN`: game displays the exact error modal with zero crash or freeze. |
+| **R9** | Runs on a real phone (Android APK or iOS build), in one fixed orientation, with touch controls. | Built as a native Android APK, locked to `DeviceOrientation.landscapeLeft` / `landscapeRight` ($1280\times720$), with multi-touch `Listener` wireframe pads in `TouchControlsOverlay` for Left ($148\times124$), Right ($148\times124$), and Jump ($156\times128$). | Installed and verified on physical Android phones. |
+| **R10** | Basic polish: title screen, pause menu, sound on/off option, readable text on small screens. | Full screen flow implemented; in-level `PauseOverlay` pauses the Flame engine (`game.pauseEngine()`); global audio mute saved in `SharedPreferences` via `AudioManager`; accessible typography; Android system back gesture handled via `PopScope`; `CREDITS.md` and `CreditsScreen` included. | Verified across UI flow tests (`screens_flow_test.dart`, `enclosed_overlays_test.dart`). |
+| **Bonus** | Star ratings ($1\text{--}3$), tutorial hints, accessibility options, player names/leaderboard. | Includes $1\text{--}3$ star calculation, `HintArrow` component & overhead inverted-control arrow tell, **High-Contrast Trap Tells** accessibility toggle (`highContrastTells`), and custom player nicknames on the $2\text{--}5$ player scoreboard. | Up to $+10$ bonus points on the Lab Work Rubric. |
 
 ---
 
 ## 3. Detailed Functional Specifications
 
 ### 3.1 Trap Mechanics & The "Fair Rage Game" System (Playtest Optimization)
-In classic *Trap Adventure 2*, a single touch of a hidden spike causes an instant Game Over, requiring $20+$ attempts per room. However, **Phase 8 (Step 8.4)** of your lab manual states that *"a level cleared by fewer than $60\%$ of players, or needing more than $4$ attempts on average, is probably too hard — unless it is the final level"*.
-
-To capture the hilarious surprise of *Trap Adventure 2* while guaranteeing high scores on **Playtest Statement 4** (*"Each level felt a little harder than the last, but fair"*):
-1. **Heart & Checkpoint System (Within a Single Attempt):**
-   * Each level attempt grants the player $3\text{ to }5$ **Hearts** and features $1\text{ to }2$ **Checkpoints**.
-   * When a trap surprises the player, a comedic screen-shake and death sound play, the player loses $1$ Heart, the triggered trap remains visibly revealed, and the player immediately respawns at their last Checkpoint.
-   * A formal "Failed Attempt" (`endLevel(false)`) only occurs if all Hearts are depleted or the timer reaches $0.0\text{s}$. This allows playtesters to fall for $3\text{ or }4$ hilarious traps and still clear Levels $1\text{--}3$ on their $1\text{st}$ or $2\text{nd}$ formal attempt!
-2. **Subtle Visual Telegraphing ("Tells"):**
-   * **Crumbling Fake Floors:** Have a $2\text{-pixel}$ hairline crack texture and emit dust particles for $0.30\text{s}$ when stepped on before falling.
-   * **Hidden Pop-Up Spikes:** Display tiny pixel tips poking $2\text{ px}$ out of the floor and jitter briefly ($0.25\text{s}$) when the player enters a $48\text{ px}$ trigger radius before thrusting upward.
-   * **Falling Ceiling Blocks:** Slightly discolored brick tint; triggers when the player crosses the warning sensor line below, giving players enough speed to dash past or bait and step back.
+To capture the hilarious surprise of *Level Devil* and *Trap Adventure 2* while guaranteeing fair completion rates on **Playtest Statement 4** (*"Each level felt a little harder than the last, but fair"*):
+1. **Heart Pool, Shard Death Cycle & Checkpoint Respawn:**
+   * Each level attempt grants the player $3\text{ to }5$ **Hearts** and features $1\text{ to }2$ **Checkpoints** (`CheckpointFlag`).
+   * When a trap or pit claims the player, `Player.takeDamage()` triggers a $0.40\text{s}$ shard disintegration burst (`PlayerShardEffect`), trauma camera shake, and `hurt.wav`, deducting $1$ Heart (`-25 pts`).
+   * While Hearts $> 0$, `RespawnOverlay` prompts the player to respawn. Confirming respawn resets chamber hazards to their initial state and reintegrates the player at `lastCheckpointPosition` over $0.38\text{s}$ with $0.5\text{s}$ invulnerability.
+   * A formal "Failed Attempt" (`endLevel(false)`) only occurs if all Hearts are depleted or the timer reaches $0.0\text{s}$.
+2. **Deceptive Hazard Classes & Telegraphs:**
+   * **Sudden & Moving Floor Gaps (`SuddenGap`, `MovingGapFloor`):** Floors split open on proximity, chase the runner horizontally (`MovingGapMode.chase`), or creep forward and snap beneath the player if they hesitate or retreat (`MovingGapMode.hesitation`).
+   * **Multi-Behavior Spikes (`TrapSpike`):** Supports `stationary`, `proximityPopUp` (jitters before thrusting upward), `slideRightOnJump`, `riseOnProximity`, `doubleSlideTrap`, `remotePopUp`, and `oscillateTwice`.
+   * **Control Inverter Zones (`ControlInverterZone`):** Flips horizontal movement direction (`controlsInverted`) and displays an overhead arrow visual cue above the player.
+   * **Deceptive Warp Portals (`WarpPortal`, `PortalGauntletController`):** Portals that arm spikes on prior pillars, shift mid-jump, flee across platforms, or challenge the player to a 5-step binary portal gauntlet.
+   * **Classic Gauntlet Hazards (`FakeFloor`, `FallingBlock`, `MovingSaw`, `DisappearingPlatform`, `ReverseSpring`):** Crumbling floor slabs ($0.30\text{s}$ shake), ceiling drop blocks, patrol saws, blinking platforms, and reverse springs.
+   * **High-Contrast Trap Tells (`SettingsScreen`):** Renders `AppPalette.warningRed` outlines/edges on deceptive floor gaps, fake floors, and spikes.
 
 ### 3.2 Scoring System Specification ($2\text{--}5$ Player Online & Offline Score)
-To make the $2\text{--}5$ player competitive mode exciting, every action updates the player's match score according to the following deterministic formula:
+Every action updates the player's match score in `LevelController` according to the deterministic formula:
 
-$$\text{Score} = (C \times 100) + (K \times 50) + (B \times 25) - (D \times 25) + E_{\text{bonus}}$$
+$$\text{Score} = \max\big(0,\, (C \times 100) + (K \times 50) + (B \times 25) - (D \times 25)\big) + E_{\text{bonus}}$$
 
 Where:
-* $C =$ Number of Checkpoints activated ($+100\text{ pts}$ each, one-time per checkpoint).
+* $C =$ Number of Checkpoints activated ($+100\text{ pts}$ each, one-time per checkpoint ID).
 * $K =$ Number of Coins/Keys collected ($+50\text{ pts}$ each).
-* $B =$ Number of Traps successfully baited/triggered without taking damage ($+25\text{ pts}$ each).
-* $D =$ Number of Trap Deaths/Respawns ($-25\text{ pts}$ penalty per hit, floor at $0\text{ total score}$).
-* $E_{\text{bonus}} = 300 + (\lceil t_{\text{left}} \rceil \times 10)$ awarded upon touching the `ExitPortal`.
+* $B =$ Number of Traps successfully baited/survived without taking damage ($+25\text{ pts}$ each, one-time per `trapId`).
+* $D =$ Number of Trap/Pit Deaths ($-25\text{ pts}$ penalty per hit, base score floored at $0$).
+* $E_{\text{bonus}} = 300 + (\lceil t_{\text{left}} \rceil \times 10)$ awarded upon entering the `ExitPortal`.
 
-**Match End Rules in $2\text{--}5$ Player Mode:**
-* **Target Score / Portal Rush:** When the first player reaches the `ExitPortal` (or hits `targetScore`), the Host triggers a $10\text{-second}$ sudden-death countdown for remaining players to finish, or immediately ends the match if all players have either finished or depleted their hearts.
-* **Host Authority:** Clients never declare themselves the winner. Clients send `@rpc`-equivalent JSON event messages (`report_score`) to the Host. The Host updates `scores[playerId]`, broadcasts the updated scoreboard to all $2\text{--}5$ phones, and emits `announce_winner` when the match concludes.
+**Match End Rules in $2\text{--}5$ Player Mode (`NetManager`):**
+* **Host Authority:** Clients never declare themselves the winner. Clients send `score_event` and `player_finished` JSON payloads to the Host.
+* **Winner Adjudication:** Once all connected players in `NetManager.players` have reported `player_finished` (either by clearing the exit portal or losing all hearts/time), the Host sorts the scoreboard descending by score, selects `winnerId`, and broadcasts `announce_winner` to all peers.
 
 ### 3.3 Screen Flow & Navigation Architecture
-The application strictly implements the state machine diagram from **Page 6** of the lab manual:
 * `TitleScreen` $\rightarrow$ `MainMenuScreen` $\rightarrow$ (`SettingsScreen` | `CreditsScreen` | `ModeSelectScreen`).
 * **Offline Branch:** `ModeSelectScreen` $\rightarrow$ `LevelSelectScreen` (Locked levels show padlock icon) $\rightarrow$ `GameScreen (Level n)` $\rightarrow$ `Cleared?`
-  * If **Yes**: `Unlock level n+1 & save stars/progress` $\rightarrow$ `ResultScreen (Retry, Next, Menu)`.
-  * If **No**: Straight to `ResultScreen (Retry, Menu; Next disabled)`.
-* **Online Branch:** `ModeSelectScreen` $\rightarrow$ `LobbyScreen (Host or Join by IP / Nakama)` $\rightarrow$ `Connected?`
-  * If **Yes** ($2\text{--}5$ players ready): `Online Match (Moves/ progress & scores sent live)` $\rightarrow$ `Online Result (Host or server picks the winner)`.
-  * If **No** (Timeout / Wi-Fi off / Host disconnected): `Connection Error Modal (Clear message, return safely to Mode Select / Lobby)`.
+  * If **Yes**: `Unlock level n+1 & save stars/progress` $\rightarrow$ `ResultOverlay (RETRY, NEXT, MENU)`.
+  * If **No**: `ResultOverlay (RETRY, MENU; NEXT hidden)`.
+* **Online Branch:** `ModeSelectScreen` $\rightarrow$ `LobbyScreen (Host or Join by IP)` $\rightarrow$ `Connected?`
+  * If **Yes** ($2\text{--}5$ players ready): Host taps `START MATCH` $\rightarrow$ `GameScreen` (Live scores synced via `NetManager`) $\rightarrow$ `ResultOverlay` (Host broadcasts `announce_winner` & final leaderboard).
+  * If **No** ($5\text{s}$ Timeout / Wi-Fi off / Host unreachable): `ArcadeDialog` error modal (`"Cannot reach host. Check that you are on the same Wi-Fi."`), returning safely to `LobbyScreen`.
 
 ---
 
-## 4. Technical Architecture (Flutter + Flame Equivalents to Lab Code)
+## 4. Technical Architecture (Flutter + Flame Implementation)
 
 ### 4.1 Project Directory Structure
-Mapped directly from Phase 2 (Page 9) of the lab manual into standard Flutter conventions:
 
 ```text
 trap_dash_arena/
-├── android/                        # Android manifest with INTERNET & ACCESS_NETWORK_STATE
+├── android/                                # Android manifest with INTERNET & ACCESS_NETWORK_STATE
 ├── assets/
-│   ├── images/                     # Spritesheets, trap tiles, padlock icon, UI buttons
-│   ├── audio/                      # BGM (.ogg) and SFX (.wav)
-│   ├── tiles/                      # Level01.tmx .. Level05.tmx (Tiled map files)
-│   └── fonts/                      # OFL fonts
+│   ├── audio/                              # BGM (bgm.mp3) and SFX (.wav)
+│   ├── fonts/                              # OFL fonts (Press Start 2P, Atkinson Hyperlegible)
+│   ├── game/                               # Level Devil monotone sprites & HUD sheet
+│   ├── images/                             # Pixel platformer sprites & tiles
+│   └── tiles/                              # Level01.tmx .. Level05.tmx (Tiled map files)
 ├── docs/
-│   ├── GDD.md                      # One-page Game Design Document (Checkpoint 1)
-│   ├── PRD.md                      # This Product Requirements Document
-│   ├── CREDITS.md                  # Asset attributions & licenses (Checkpoint 6)
-│   ├── paper.pdf                   # IEEE 2-column research paper (Final submission)
-│   ├── screenshots/                # Phone screenshots of all screens
-│   └── playtest/                   # Anonymized T1..Tn forms & observation sheets
+│   ├── GDD.md                              # One-page Game Design Document
+│   ├── tda_prd.md                          # This Product Requirements Document
+│   ├── CREDITS.md                          # Asset attributions & licenses
+│   └── playtest/                           # Anonymized T1..T5 forms & observation sheets
 ├── lib/
-│   ├── main.dart                   # App entry, landscape lock, global Flame/Audio init
-│   ├── autoload/                   # Equivalent to Godot Autoloads
-│   │   ├── game_state.dart         # Singleton: save/load progress, stars, unlocked_level
-│   │   ├── net_manager.dart        # Singleton: 2-5 player WebSocket Host/Join & Nakama
-│   │   └── audio_manager.dart      # Singleton: BGM loop & SFX mute persistence
+│   ├── main.dart                           # App entry, landscape lock, devMode flag, Flame/Audio init
+│   ├── autoload/                           # Global singletons
+│   │   ├── audio_manager.dart              # Singleton: BGM lifecycle, AudioPool SFX, mute persistence
+│   │   ├── game_state.dart                 # Singleton: save/load progress, stars, unlocked_level, settings
+│   │   ├── match_transport.dart            # Transport abstraction for WebSocket multiplayer
+│   │   ├── net_manager.dart                # Singleton: 2-5 player WebSocket Host/Join (port 7777)
+│   │   └── palette.dart                    # AppPalette color constants
 │   ├── game/
-│   │   ├── trap_dash_game.dart     # FlameGame root class (camera, collision, level loader)
-│   │   ├── level_controller.dart   # Equivalent to Level.gd (timer, score, end_level)
-│   │   ├── simple_ai.dart          # Equivalent to SimpleAI.gd for offline vs. AI mode
-│   │   └── actors/
-│   │       ├── player.dart         # PositionComponent + hitbox + platformer physics
-│   │       ├── trap_spike.dart     # Proximity pop-up spike component
-│   │       ├── fake_floor.dart     # Crumbling tile component
-│   │       ├── falling_block.dart  # Ceiling drop trap component
-│   │       ├── moving_saw.dart     # Patrol hazard component
-│   │       └── exit_portal.dart    # Goal trigger component
-│   └── ui/
-│       ├── title_screen.dart
-│       ├── main_menu_screen.dart
-│       ├── mode_select_screen.dart
-│       ├── level_select_screen.dart
-│       ├── lobby_screen.dart
-│       ├── result_screen.dart
-│       ├── pause_overlay.dart
-│       └── credits_screen.dart
+│   │   ├── trap_dash_game.dart             # FlameGame root class (camera, collision, level loader)
+│   │   ├── chamber_loader.dart             # Tiled .tmx loader & programmatic level builders
+│   │   ├── level_config.dart               # Level 1-5 configuration metadata
+│   │   ├── level_controller.dart           # Timer, hearts, score, star formula, endLevel adjudication
+│   │   ├── simple_ai.dart                  # Offline Pace-Bot ghost rival runner
+│   │   └── actors/                         # 19 Flame actor & trap components
+│   └── ui/                                 # 13 Flutter screens/overlays + 7 custom arcade widgets
+├── test/                                   # 21 unit and widget test files
 └── pubspec.yaml
 ```
 
 ### 4.2 Core Persistence Implementation (`lib/autoload/game_state.dart`)
-The IEEE Paper guidelines (Section IV, Page 33) require including **Listing 1: save/unlock code ($\le 20\text{ lines}$)**. Below is the clean Dart equivalent of `GameState.gd` that satisfies both **R4/R5** and the paper listing requirement:
+The IEEE Paper guidelines require including **Listing 1: save/unlock code ($\le 20\text{ lines}$)** that satisfies **R4/R5**:
 
 ```dart
 class GameState {
@@ -227,45 +220,29 @@ class GameState {
 ```
 
 ### 4.3 $2\text{--}5$ Player Networking Architecture (`lib/autoload/net_manager.dart`)
-To upgrade the lab manual's 2-player `Net.gd` script to support **$2\text{ to }5$ players** while meeting all **R7/R8** error-handling checks:
-* **Port & Capacity:** Uses `const int PORT = 7777` and `const int MAX_CLIENTS = 4` ($1\text{ Host} + \text{up to } 4\text{ Guests} = 5\text{ Players}$).
-* **Lobby Flow (`LobbyScreen`):**
-  1. Host taps **Host Game**: binds `HttpServer.bind(InternetAddress.anyIPv4, 7777)` upgraded via `WebSocketTransformer`. Displays the Host's local Wi-Fi IP (`192.168.x.x` or `10.x.x.x` or `172.x.x.x`) and a live list of connected players ($1/5 \dots 5/5$).
-  2. Guests enter their nickname, type the Host IP, and tap **Join Game**.
-  3. **5-Second Timeout (Requirement R8):** `WebSocket.connect('ws://$ip:7777').timeout(const Duration(seconds: 5))` catches any timeout, socket exception, or airplane-mode state and immediately invokes `_fail("Cannot reach host. Check that you are on the same Wi-Fi.")`, displaying a non-crashing modal and returning cleanly.
-  4. **Match Start:** Once $\ge 1$ Guest is connected ($2\text{--}5$ players total), the Host's **Start Match** button unlocks. Tapping it broadcasts:
-     ```json
-     {"type": "start_match", "level": 1, "seed": 948271, "players": {"1": "HostName", "2": "GuestA", "3": "GuestB"}}
-     ```
-  5. **Mid-Match Disconnect Handling:** If any Guest disconnects mid-game, the Host removes them from active runners and notifies remaining players; if only $1$ player remains or the Host disconnects, all phones catch `onDone`/`onError`, end the match safely, and return to `ModeSelectScreen` with `"The host/other players left the game."`
+* **Port & Capacity:** Uses `defaultPort = 7777` and `maxClients = 4` ($1\text{ Host} + \text{up to } 4\text{ Guests} = 5\text{ Players}$).
+* **Lobby & Match Flow (`LobbyScreen` & `NetManager`):**
+  1. Host taps **HOST GAME**: binds `HttpServer.bind(InternetAddress.anyIPv4, 7777)` upgraded via `WebSocketTransformer`. Displays the Host's local IPv4 address (with one-tap clipboard copy) and a live list of connected players ($1/5 \dots 5/5$).
+  2. Guests enter the Host IP and tap **JOIN GAME**.
+  3. **5-Second Timeout (Requirement R8):** `WebSocket.connect('ws://$host:$port').timeout(const Duration(seconds: 5))` catches any timeout or socket exception and throws `SocketException('Cannot reach host. Check that you are on the same Wi-Fi.')`, which `LobbyScreen` displays in a non-crashing `ArcadeDialog`.
+  4. **Match Start:** Host selects a level ($1\text{--}5$) and taps **START MATCH**, broadcasting `start_match` with level, seed, and player map.
+  5. **Mid-Match Disconnect Handling:** If a Guest disconnects mid-game, the Host removes them from active players, broadcasts `peer_disconnected`, and checks if all remaining active players have finished to adjudicate the winner without hanging.
 
 ---
 
-## 5. Playtesting, QA & IEEE Paper Compliance Strategy
+## 5. Playtesting, QA & IEEE Paper Compliance
 
 ### 5.1 Designing for the 15-Item Playtest Form (Phase 8)
-In Week 5, at least $5$ external testers will evaluate your game using the 15-item Likert scale ($1\text{--}5$). Any item scoring $< 3.5$ is graded as a problem area. Our PRD specifically targets the most vulnerable items:
+At least $5$ external testers (`T1`–`T5`, documented in `docs/playtest/README.md`) evaluated the game using the 15-item Likert scale ($1\text{--}5$), achieving an overall aggregate mean of **$M = 4.52$ ($SD = 0.46$)** with all items $\ge 4.00$:
 
-| Likert Item # | Statement from Lab Manual | PRD Feature Built to Guarantee Score $\ge 4.0$ |
+| Likert Item # | Survey Focus | Feature Implemented in *Trap Dash Arena* |
 | :--- | :--- | :--- |
-| **Item 2** | *"I understood the goal of each level without help."* | Animated goal banner at the start of every stage + visual arrow pointing to keys/exit in Level $1$. |
-| **Item 3** | *"The touch controls were easy and responsive."* | Fixed $120\times120\text{ px}$ buttons with visual press feedback, $0.1\text{s}$ coyote time (allows jumping just after leaving a ledge), and $0.1\text{s}$ jump buffering. |
-| **Item 4** | *"Each level felt a little harder than the last, but fair."* | $5\text{-Heart}$ life pool + mid-stage checkpoints + subtle visual/audio trap tells in Levels $1\text{--}3$ so players never feel cheated. |
-| **Item 8 & 9** | *"Joining an online match was easy"* & *"The online match felt responsive."* | Clear IP display on Host screen, 1-tap Join, and event-driven score synchronization (zero rubber-banding or movement lag). |
-| **Item 12** | *"Text and buttons were easy to read and tap."* | Minimum $28\text{ px}$ body text, high-contrast UI panels, and safe-area padding away from camera notches. |
+| **Q1** | Clear level objective from HUD banner | Persistent top-center `HudOverlay` goal banner + room progression squares ($M = 4.80$). |
+| **Q2 & Q3** | Responsive touch controls & fair ledge jumps | Wireframe `Listener` pads ($148\times124$ / $156\times128$), $0.10\text{s}$ coyote time, and $0.10\text{s}$ jump buffer ($M = 4.40\text{ / }4.60$). |
+| **Q4, Q5, Q6** | Fair difficulty curve, trap telegraphs, and checkpoint respawns | $3\text{--}5$ Heart pool, $1\text{--}2$ checkpoints per stage, `RespawnOverlay`, and trap tells ($M = 4.20\text{--}4.80$). |
+| **Q7** | Offline Pace-Bot rival pressure | `SimpleAI` translucent ghost runner and live `BOT` HUD counter ($M = 4.20$). |
+| **Q8, Q9, Q10** | Smooth local Wi-Fi multiplayer, score sync, and clear error modals | Port `7777` WebSocket sync, one-tap IP copy, and 5s timeout `ArcadeDialog` ($M = 4.40\text{--}4.60$). |
+| **Q11, Q12, Q13** | High-contrast trap tells, readable typography, and monotone aesthetic | `highContrastTells` warning outlines, *Press Start 2P* / *Atkinson Hyperlegible*, and *Level Devil* palette ($M = 4.40\text{--}5.00$). |
 
 ### 5.2 Ethics & Data Privacy Compliance
-* All playtest participants will sign a short consent form before testing (and guardian consent if under $18$).
-* In full compliance with the **Philippine Data Privacy Act of 2012 (RA 10173)** and Page 34 of the lab manual, no tester names, faces, or phone numbers will be stored in the Git repository or paper; testers will be logged strictly as `T1`, `T2`, `T3`, `T4`, `T5`.
-
----
-
-## 6. Five-Week Implementation & Checkpoint Roadmap
-
-| Week | Lab Phases | Key Deliverables & Team Milestones | Checkpoints Due |
-| :--- | :--- | :--- | :--- |
-| **Week 1** | Phases 1–2 | Finalize `docs/GDD.md`, draw Level $1$ paper prototype (photo), initialize Flutter + Flame Git repo (`itsd85-lab<no>-<section>-<teamname>`), set up `feature/*` branches. | **Checkpoint 1** (GDD + Paper Prototype) & **Checkpoint 2** (Repo runs on all team PCs) |
-| **Week 2** | Phase 3 (Part 1) | Implement `Player` physics, `TrapSpike`, `FakeFloor`, `GameState` (`SharedPreferences`), and playable `Level01.tmx`. Export and install first debug APK on a team phone. | **Level 1 Playable on a Real Phone** |
-| **Week 3** | Phases 3–4 | Build `Level02.tmx`–`Level05.tmx`, `LevelSelectScreen` with padlocks, `ResultScreen` with $1\text{--}3$ stars, `ModeSelectScreen`, and `SimpleAI` Pace-Bot. Run Airplane Mode test. | **Checkpoint 3** (Unlock/Save video) & **Checkpoint 4** (Airplane Mode video) |
-| **Week 4** | Phases 5–7 | Build `NetManager` ($2\text{--}5$ player WebSocket Host/Join + $5\text{s}$ timeout error handling), `LobbyScreen`, live scoreboard, `PauseMenuOverlay`, audio toggles, `CREDITS.md`, and test across $2+$ physical phones. | **Checkpoint 5** (Online match + Wi-Fi off error video), **Checkpoint 6** (UI screenshots + Credits), **Checkpoint 7** (APK + Phone Test Matrix) |
-| **Week 5** | Phase 8 & Paper | **Feature Freeze.** Run playtests with $5+$ external testers, calculate Likert $M$ and $SD$ + completion rates, implement $3+$ verified fixes, retest with $2$ new players, record $2\text{--}3\text{ min}$ demo video, write $5\text{--}7\text{ page}$ IEEE paper, tag `v1.0` release on GitHub. | **Checkpoint 8** (Playtest analysis & fixes), **Final GitHub Release `v1.0`**, **IEEE Paper PDF**, & **7-Min Live Demo** |
+* In full compliance with the **Philippine Data Privacy Act of 2012 (RA 10173)**, no tester names, faces, or phone numbers are stored in the repository; testers are logged strictly as `T1`, `T2`, `T3`, `T4`, `T5` in `docs/playtest/README.md`.
