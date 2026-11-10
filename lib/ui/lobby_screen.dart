@@ -116,7 +116,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   void _showErrorDialog(String message) {
-    showDialog(
+    showArcadeDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(

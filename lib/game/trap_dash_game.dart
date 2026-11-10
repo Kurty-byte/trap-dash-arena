@@ -10,11 +10,13 @@ import 'package:trap_dash_arena/autoload/audio_manager.dart';
 import 'package:trap_dash_arena/autoload/game_state.dart';
 import 'package:trap_dash_arena/autoload/net_manager.dart';
 import 'package:trap_dash_arena/autoload/palette.dart';
+import 'package:trap_dash_arena/game/actors/arsenal_cannon.dart';
 import 'package:trap_dash_arena/game/actors/control_inverter_zone.dart';
 import 'package:trap_dash_arena/game/actors/disappearing_platform.dart';
 import 'package:trap_dash_arena/game/actors/fake_floor.dart';
 import 'package:trap_dash_arena/game/actors/falling_block.dart';
 import 'package:trap_dash_arena/game/actors/moving_gap_floor.dart';
+import 'package:trap_dash_arena/game/actors/moving_saw.dart';
 import 'package:trap_dash_arena/game/actors/player.dart';
 import 'package:trap_dash_arena/game/actors/portal_gauntlet_controller.dart';
 import 'package:trap_dash_arena/game/actors/sudden_gap.dart';
@@ -86,6 +88,8 @@ class TrapDashGame extends FlameGame
         'game/button.png',
         'game/bomb.png',
         'game/teleport.png',
+        'game/arsenal.png',
+        'game/ball.png',
         'game/hud.png',
       ]);
     } catch (_) {}
@@ -208,6 +212,14 @@ class TrapDashGame extends FlameGame
         child.resetToInitial();
       } else if (child is PortalGauntletController) {
         child.resetToInitial();
+      } else if (child is ArsenalCannon) {
+        child.resetToInitial();
+      } else if (child is DisableButton) {
+        child.resetToInitial();
+      } else if (child is MovingSaw) {
+        child.resetToInitial();
+      } else if (child is ArsenalBall) {
+        child.removeFromParent();
       }
     }
 

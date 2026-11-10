@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flame/components.dart';
 import 'package:flame_tiled/flame_tiled.dart';
 import 'package:flutter/foundation.dart';
+import 'package:trap_dash_arena/game/actors/arsenal_cannon.dart';
 import 'package:trap_dash_arena/game/actors/chamber_background.dart';
 import 'package:trap_dash_arena/game/actors/checkpoint_flag.dart';
 import 'package:trap_dash_arena/game/actors/control_inverter_zone.dart';
@@ -132,8 +133,9 @@ class ChamberLoader {
       for (final obj in objectsGroup.objects) {
         final pos = Vector2(obj.x, obj.y);
         final size = Vector2(obj.width, obj.height);
+        final objType = obj.type.isNotEmpty ? obj.type : obj.name;
 
-        switch (obj.name) {
+        switch (objType) {
           case 'Spawn':
             spawn = pos;
             break;
@@ -236,13 +238,51 @@ class ChamberLoader {
             ));
             break;
           case 'MovingSaw':
-            final endX = obj.properties.getValue<double>('endX') ?? pos.x + 80;
-            final endY = obj.properties.getValue<double>('endY') ?? pos.y;
-            final speed = obj.properties.getValue<double>('speed') ?? 100.0;
+            final endX = (obj.properties.getValue('endX') as num?)?.toDouble() ??
+                obj.properties.getValue<double>('endX') ??
+                pos.x + 80;
+            final endY = (obj.properties.getValue('endY') as num?)?.toDouble() ??
+                obj.properties.getValue<double>('endY') ??
+                pos.y;
+            final speed = (obj.properties.getValue('speed') as num?)?.toDouble() ??
+                obj.properties.getValue<double>('speed') ??
+                100.0;
+            final radius = (obj.properties.getValue('radius') as num?)?.toDouble() ?? 18.0;
+
+            final jumpPatSetsStr = obj.properties.getValue<String>('jumpPatternSets');
+            List<List<bool>>? jumpPatSets;
+            if (jumpPatSetsStr != null && jumpPatSetsStr.isNotEmpty) {
+              jumpPatSets = jumpPatSetsStr
+                  .split(';')
+                  .map((set) => set
+                      .split(',')
+                      .map((s) => s.trim().toLowerCase() == 'up' || s.trim().toLowerCase() == 'true')
+                      .toList())
+                  .toList();
+            }
+
+            final jumpPatStr = obj.properties.getValue<String>('jumpPattern');
+            List<bool>? jumpPat;
+            if (jumpPatStr != null && jumpPatStr.isNotEmpty) {
+              jumpPat = jumpPatStr
+                  .split(',')
+                  .map((s) => s.trim().toLowerCase() == 'up' || s.trim().toLowerCase() == 'true')
+                  .toList();
+            }
+            final trigDist = (obj.properties.getValue('proximityTriggerDistance') as num?)?.toDouble() ?? 115.0;
+            final jumpOffY = (obj.properties.getValue('jumpOffsetY') as num?)?.toDouble() ?? -70.0;
+            final jumpDur = (obj.properties.getValue('jumpDuration') as num?)?.toDouble() ?? 0.48;
+
             game.world.add(MovingSaw(
               pathStart: pos,
               pathEnd: Vector2(endX, endY),
               speed: speed,
+              radius: radius,
+              proximityJumpPattern: jumpPat,
+              proximityJumpPatternSets: jumpPatSets,
+              proximityTriggerDistance: trigDist,
+              jumpOffsetY: jumpOffY,
+              jumpDuration: jumpDur,
             ));
             break;
           case 'DisappearingPlatform':
@@ -365,6 +405,63 @@ class ChamberLoader {
             break;
           case 'PortalGauntletController':
             game.world.add(PortalGauntletController());
+            break;
+          case 'ArsenalCannon':
+            final row1 = (obj.properties.getValue('row1Y') as num?)?.toDouble() ?? 530.0;
+            final row2 = (obj.properties.getValue('row2Y') as num?)?.toDouble() ?? 474.0;
+            final speed = (obj.properties.getValue('moveSpeed') as num?)?.toDouble() ?? 320.0;
+            final interval = (obj.properties.getValue('fireInterval') as num?)?.toDouble() ?? 0.85;
+            final ballSpd = (obj.properties.getValue('ballSpeed') as num?)?.toDouble() ?? 380.0;
+            final minX = (obj.properties.getValue('activeMinPlayerX') as num?)?.toDouble() ?? 96.0;
+            final maxX = (obj.properties.getValue('activeMaxPlayerX') as num?)?.toDouble() ?? 1184.0;
+            final rowPatSetsStr = obj.properties.getValue<String>('rowPatternSets');
+            List<List<int>>? rowPatSets;
+            if (rowPatSetsStr != null && rowPatSetsStr.isNotEmpty) {
+              rowPatSets = rowPatSetsStr
+                  .split(';')
+                  .map((set) => set
+                      .split(',')
+                      .map((s) => int.tryParse(s.trim()) ?? 1)
+                      .toList())
+                  .toList();
+            }
+
+            final patternStr = obj.properties.getValue<String>('rowPattern');
+            List<int> pattern = const [1, 2, 1, 2, 2, 1];
+            if (patternStr != null && patternStr.isNotEmpty) {
+              pattern = patternStr
+                  .split(',')
+                  .map((s) => int.tryParse(s.trim()) ?? 1)
+                  .toList();
+            }
+            final spawnHidden = obj.properties.getValue<bool>('spawnHiddenBelow') ?? false;
+            final trigX = (obj.properties.getValue('triggerPlayerX') as num?)?.toDouble() ?? 0.0;
+            final hidY = (obj.properties.getValue('hiddenY') as num?)?.toDouble() ?? 596.0;
+            final emergeSpd = (obj.properties.getValue('emergeSpeed') as num?)?.toDouble() ?? 420.0;
+
+            game.world.add(ArsenalCannon(
+              trapId: 'ac_${obj.id}',
+              position: pos,
+              row1Y: row1,
+              row2Y: row2,
+              rowPattern: pattern,
+              rowPatternSets: rowPatSets,
+              moveSpeed: speed,
+              fireInterval: interval,
+              ballSpeed: ballSpd,
+              activeMinPlayerX: minX,
+              activeMaxPlayerX: maxX,
+              spawnHiddenBelow: spawnHidden,
+              triggerPlayerX: trigX,
+              hiddenY: hidY,
+              emergeSpeed: emergeSpd,
+            ));
+            break;
+          case 'DisableButton':
+            game.world.add(DisableButton(
+              trapId: 'db_${obj.id}',
+              position: pos,
+            ));
             break;
         }
       }
@@ -983,49 +1080,150 @@ class ChamberLoader {
 
   static ChamberLoadResult _buildLevel5(TrapDashGame game) {
     final w = game.world;
-    // Low ceiling overhang
-    w.add(GroundBlock(position: Vector2(96, 104), size: Vector2(824, 84)));
 
-    // Slab 1
-    w.add(GroundBlock(position: Vector2(96, 552), size: Vector2(180, 200)));
-    w.add(ReverseSpring(trapId: 'rs5_1', position: Vector2(228, 552)));
+    // Partition upper wall roofs between rooms leaving 96px high passage tunnels (y: 456..552)
+    w.add(GroundBlock(position: Vector2(1184, 104), size: Vector2(192, 352)));
+    w.add(GroundBlock(position: Vector2(2464, 104), size: Vector2(192, 352)));
 
-    // Pit 1
-    w.add(FakeFloor(trapId: 'f5_1', position: Vector2(292, 552), size: Vector2(68, 24)));
+    // Passage Checkpoints (Checkpoints 1 & 2)
+    w.add(CheckpointFlag(checkpointId: 1, position: Vector2(1312, 552)));
+    w.add(CheckpointFlag(checkpointId: 2, position: Vector2(2592, 552)));
 
-    // Slab 2
-    w.add(GroundBlock(position: Vector2(376, 552), size: Vector2(200, 200)));
-    w.add(FallingBlock(trapId: 'fb5_1', position: Vector2(396, 188), groundY: 552));
-    w.add(MovingSaw(
-      pathStart: Vector2(460, 534),
-      pathEnd: Vector2(556, 534),
-      speed: 120,
+    // ==========================================
+    // Room 1 / Platform 1 (x: 96..1184) + Passage 1 (x: 1184..1376)
+    // Continuous solid runway so player focuses on reading Row 1 vs Row 2
+    // ==========================================
+    w.add(GroundBlock(position: Vector2(96, 552), size: Vector2(1280, 200)));
+
+    final p1Arsenal = ArsenalCannon(
+      trapId: 'l5_p1_arsenal',
+      position: Vector2(1148, 530),
+      row1Y: 530.0,
+      row2Y: 474.0,
+      rowPattern: const [1, 2, 1, 2, 2, 1],
+      rowPatternSets: const [
+        [1, 2, 1, 2, 2, 1],
+        [2, 1, 1, 2, 1, 2],
+        [1, 1, 2, 2, 1, 2],
+      ],
+      moveSpeed: 320.0,
+      fireInterval: 0.85,
+      ballSpeed: 380.0,
+      activeMinPlayerX: 96.0,
+      activeMaxPlayerX: 1184.0,
+    );
+    w.add(p1Arsenal);
+
+    w.add(DisableButton(
+      trapId: 'l5_p1_button',
+      position: Vector2(1060, 552),
+      targetCannon: p1Arsenal,
     ));
 
-    // Slab 3
-    w.add(GroundBlock(position: Vector2(604, 552), size: Vector2(192, 200)));
-    w.add(CheckpointFlag(checkpointId: 1, position: Vector2(644, 552)));
-    w.add(PickupItem(type: PickupType.coin, position: Vector2(700, 500)));
-    w.add(ReverseSpring(trapId: 'rs5_2', position: Vector2(756, 552)));
+    // ==========================================
+    // Room 2 / Platform 2 (x: 1376..2464) + Passage 2 (x: 2464..2656)
+    // ==========================================
+    w.add(GroundBlock(position: Vector2(1376, 552), size: Vector2(204, 200)));
+    w.add(GroundBlock(position: Vector2(1668, 552), size: Vector2(184, 200)));
+    w.add(GroundBlock(position: Vector2(1940, 552), size: Vector2(184, 200)));
+    w.add(GroundBlock(position: Vector2(2212, 552), size: Vector2(444, 200)));
 
-    // Pit 2
-    w.add(DisappearingPlatform(position: Vector2(824, 512), size: Vector2(72, 20)));
-    w.add(FallingBlock(trapId: 'fb5_2', position: Vector2(840, 188), groundY: 512));
+    // 3 pits with vertical moving saws at varying speeds
     w.add(MovingSaw(
-      pathStart: Vector2(932, 430),
-      pathEnd: Vector2(932, 555),
-      speed: 110,
+      pathStart: Vector2(1624, 430),
+      pathEnd: Vector2(1624, 610),
+      speed: 160.0,
     ));
-    w.add(FakeFloor(trapId: 'f5_2', position: Vector2(960, 552), size: Vector2(64, 24)));
+    w.add(MovingSaw(
+      pathStart: Vector2(1896, 420),
+      pathEnd: Vector2(1896, 610),
+      speed: 260.0,
+    ));
+    w.add(MovingSaw(
+      pathStart: Vector2(2168, 410),
+      pathEnd: Vector2(2168, 610),
+      speed: 360.0,
+    ));
 
-    // Elevated exit altar
-    w.add(GroundBlock(position: Vector2(1036, 516), size: Vector2(148, 236)));
-    w.add(PickupItem(type: PickupType.coin, position: Vector2(1072, 466)));
-    w.add(ExitPortal(position: Vector2(1136, 516)));
+    // ==========================================
+    // Room 3 / Platform 3 (x: 2656..3744) - Climax Gauntlet & Exit
+    // ==========================================
+    // Flat continuous floor slab across entire Room 3
+    w.add(GroundBlock(position: Vector2(2656, 552), size: Vector2(1088, 200)));
+
+    // Giant deceptive proximity-jumping saw half-submerged in floor
+    w.add(MovingSaw(
+      pathStart: Vector2(3540, 552),
+      pathEnd: Vector2(2740, 552),
+      speed: 260.0,
+      radius: 32.0,
+      proximityJumpPattern: const [true, false, true, true, false],
+      proximityJumpPatternSets: const [
+        [true, false, true, true, false],
+        [false, true, false, false, true],
+        [false, false, true, false, true],
+      ],
+      proximityTriggerDistance: 120.0,
+      jumpOffsetY: -98.0,
+      jumpDuration: 0.50,
+      priority: -1,
+    ));
+
+    // Mid-platform pop-up ambush arsenal cannon (rapid-fire)
+    final p3Arsenal = ArsenalCannon(
+      trapId: 'l5_p3_arsenal',
+      position: Vector2(3590, 530),
+      rowPattern: const [2, 1, 2, 1, 1, 2],
+      rowPatternSets: const [
+        [2, 1, 2, 1, 1, 2],
+        [1, 1, 2, 1, 2, 2],
+        [2, 2, 1, 2, 1, 1],
+      ],
+      activeMinPlayerX: 2656.0,
+      activeMaxPlayerX: 3744.0,
+      spawnHiddenBelow: true,
+      triggerPlayerX: 2960.0,
+      hiddenY: 596.0,
+      emergeSpeed: 520.0,
+      fireInterval: 0.45,
+      ballSpeed: 420.0,
+      moveSpeed: 380.0,
+    );
+    w.add(p3Arsenal);
+
+    // Disable button for ambush cannon
+    w.add(DisableButton(
+      trapId: 'l5_p3_button',
+      position: Vector2(3510, 552),
+      targetCannon: p3Arsenal,
+    ));
+
+    // Hidden pop-up spike right in front of exit door
+    w.add(TrapSpike(
+      trapId: 'l5_p3_spike_front',
+      position: Vector2(3648, 552),
+      behavior: SpikeBehavior.proximityPopUp,
+      triggerDistance: 42.0,
+      jitterDuration: 0.08,
+      hideCompletelyWhenIdle: true,
+    ));
+
+    // Final Exit Portal in Room 3
+    w.add(ExitPortal(position: Vector2(3688, 552)));
+
+    // Sudden trap spike right behind door to punish overshooting or hesitation
+    w.add(TrapSpike(
+      trapId: 'l5_p3_spike_back',
+      position: Vector2(3724, 552),
+      behavior: SpikeBehavior.proximityPopUp,
+      triggerDistance: 40.0,
+      jitterDuration: 0.08,
+      hideCompletelyWhenIdle: true,
+    ));
 
     return ChamberLoadResult(
-      spawnPosition: Vector2(136, 552),
-      exitX: 1136.0,
+      spawnPosition: Vector2(148, 552),
+      exitX: 3688.0,
     );
   }
 }

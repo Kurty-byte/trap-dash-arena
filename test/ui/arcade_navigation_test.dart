@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trap_dash_arena/autoload/game_state.dart';
 import 'package:trap_dash_arena/ui/game_screen.dart';
 import 'package:trap_dash_arena/ui/main_menu_screen.dart';
+import 'package:trap_dash_arena/ui/widgets/arcade_dialog.dart';
 import 'package:trap_dash_arena/ui/widgets/arcade_page_route.dart';
 
 void main() {
@@ -15,13 +16,13 @@ void main() {
   });
 
   group('Arcade Navigation & Transition Tests', () {
-    test('ArcadePageRoute duration defaults to 100 milliseconds', () {
+    test('ArcadePageRoute duration defaults to zero (instantaneous cut)', () {
       final route = ArcadePageRoute(page: const SizedBox());
-      expect(route.transitionDuration, const Duration(milliseconds: 100));
-      expect(route.reverseTransitionDuration, const Duration(milliseconds: 100));
+      expect(route.transitionDuration, Duration.zero);
+      expect(route.reverseTransitionDuration, Duration.zero);
     });
 
-    testWidgets('ArcadePageRoute performs dip-to-black transition', (tester) async {
+    testWidgets('ArcadePageRoute transitions instantaneously without delay', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -50,15 +51,46 @@ void main() {
       await tester.tap(find.text('GO'));
       await tester.pump();
 
-      // At midpoint (50ms), both screens are in flight behind curtain
-      await tester.pump(const Duration(milliseconds: 50));
+      // Screen is mounted immediately without waiting for animation frames
       expect(find.text('TARGET SCREEN'), findsOneWidget);
+    });
 
-      // Complete transition (remaining 50ms)
-      await tester.pump(const Duration(milliseconds: 50));
-      await tester.pumpAndSettle();
+    testWidgets('showArcadeConfirmDialog renders dialog content instantaneously', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () {
+                  showArcadeConfirmDialog(
+                    context: context,
+                    title: 'RESET PROGRESS?',
+                    message: 'This will clear all unlocked levels and stars.',
+                  );
+                },
+                child: const Text('OPEN DIALOG'),
+              ),
+            ),
+          ),
+        ),
+      );
 
-      expect(find.text('TARGET SCREEN'), findsOneWidget);
+      expect(find.text('RESET PROGRESS?'), findsNothing);
+
+      await tester.tap(find.text('OPEN DIALOG'));
+      await tester.pump();
+
+      // Dialog is visible immediately
+      expect(find.text('RESET PROGRESS?'), findsOneWidget);
+      expect(find.text('This will clear all unlocked levels and stars.'), findsOneWidget);
+      expect(find.text('CONFIRM'), findsOneWidget);
+      expect(find.text('CANCEL'), findsOneWidget);
+
+      await tester.tap(find.text('CANCEL'));
+      await tester.pump();
+
+      // Dialog dismissed immediately
+      expect(find.text('RESET PROGRESS?'), findsNothing);
     });
 
     testWidgets('MainMenuScreen renders CONTINUE LVL 1 and updates dynamically', (tester) async {

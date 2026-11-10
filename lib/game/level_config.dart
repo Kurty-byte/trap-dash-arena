@@ -61,6 +61,7 @@ class LevelConfig {
       timeLimit: 60.0,
       initialHearts: 3,
       requiredKeys: 0,
+      roomCount: 3,
     ),
   ];
 

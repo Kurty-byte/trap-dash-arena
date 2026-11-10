@@ -12,6 +12,11 @@ class MovingSaw extends PositionComponent
   final Vector2 pathStart;
   final Vector2 pathEnd;
   final double speed;
+  final List<bool>? proximityJumpPattern;
+  final List<List<bool>>? proximityJumpPatternSets;
+  final double proximityTriggerDistance;
+  final double jumpOffsetY;
+  final double jumpDuration;
 
   late final double _totalDistance;
   late final double _pathDeltaX;
@@ -20,18 +25,36 @@ class MovingSaw extends PositionComponent
   double _t = 0.0;
   int _direction = 1;
   double _rotationAngle = 0.0;
+  int proximityPatternIndex = 0;
+  int activePatternSetIndex = 0;
+  bool _inProximityZone = false;
+  double _jumpTimer = 0.0;
   Sprite? _sawSprite;
   late final CircleHitbox hitbox;
+
+  List<bool>? get activeProximityJumpPattern {
+    if (proximityJumpPatternSets != null && proximityJumpPatternSets!.isNotEmpty) {
+      return proximityJumpPatternSets![activePatternSetIndex % proximityJumpPatternSets!.length];
+    }
+    return proximityJumpPattern;
+  }
 
   MovingSaw({
     required this.pathStart,
     required this.pathEnd,
     this.speed = 120.0,
     double radius = 18.0,
+    this.proximityJumpPattern,
+    this.proximityJumpPatternSets,
+    this.proximityTriggerDistance = 115.0,
+    this.jumpOffsetY = -70.0,
+    this.jumpDuration = 0.48,
+    int priority = -1,
   }) : super(
           position: pathStart.clone(),
           size: Vector2.all(radius * 2),
           anchor: Anchor.center,
+          priority: priority,
         ) {
     _pathDeltaX = pathEnd.x - pathStart.x;
     _pathDeltaY = pathEnd.y - pathStart.y;
@@ -64,6 +87,36 @@ class MovingSaw extends PositionComponent
   void update(double dt) {
     super.update(dt);
 
+    double verticalJumpOffset = 0.0;
+    final currentJumpPattern = activeProximityJumpPattern;
+    if (currentJumpPattern != null && currentJumpPattern.isNotEmpty) {
+      try {
+        final player = game.player;
+        if (!player.isInDeathCycle) {
+          final dist = (player.position.x - position.x).abs();
+          if (dist <= proximityTriggerDistance && !_inProximityZone) {
+            _inProximityZone = true;
+            final shouldJump = currentJumpPattern[proximityPatternIndex];
+            proximityPatternIndex =
+                (proximityPatternIndex + 1) % currentJumpPattern.length;
+            if (shouldJump) {
+              _jumpTimer = jumpDuration;
+            }
+          } else if (dist > proximityTriggerDistance + 48.0) {
+            _inProximityZone = false;
+          }
+        }
+      } catch (_) {
+        // Fallback when player is not attached in unit tests
+      }
+
+      if (_jumpTimer > 0) {
+        _jumpTimer = max(0.0, _jumpTimer - dt);
+        verticalJumpOffset =
+            sin((1.0 - _jumpTimer / jumpDuration) * pi) * jumpOffsetY;
+      }
+    }
+
     if (_totalDistance > 0) {
       _t += (_direction * speed * dt) / _totalDistance;
       if (_t >= 1.0) {
@@ -75,11 +128,29 @@ class MovingSaw extends PositionComponent
       }
       position.setValues(
         pathStart.x + _pathDeltaX * _t,
-        pathStart.y + _pathDeltaY * _t,
+        pathStart.y + _pathDeltaY * _t + verticalJumpOffset,
+      );
+    } else {
+      position.setValues(
+        pathStart.x,
+        pathStart.y + verticalJumpOffset,
       );
     }
 
     _rotationAngle += dt * 12.0;
+  }
+
+  void resetToInitial() {
+    _t = 0.0;
+    _direction = 1;
+    _rotationAngle = 0.0;
+    proximityPatternIndex = 0;
+    _inProximityZone = false;
+    _jumpTimer = 0.0;
+    position.setFrom(pathStart);
+    if (proximityJumpPatternSets != null && proximityJumpPatternSets!.length > 1) {
+      activePatternSetIndex = (activePatternSetIndex + 1) % proximityJumpPatternSets!.length;
+    }
   }
 
   @override

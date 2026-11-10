@@ -2,6 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:trap_dash_arena/autoload/audio_manager.dart';
 import 'package:trap_dash_arena/autoload/palette.dart';
 
+/// Displays an instantaneous zero-transition modal dialog.
+Future<T?> showArcadeDialog<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool barrierDismissible = true,
+  Color barrierColor = const Color(0x80000000),
+}) {
+  return showGeneralDialog<T>(
+    context: context,
+    barrierDismissible: barrierDismissible,
+    barrierLabel: 'Dismiss',
+    barrierColor: barrierColor,
+    transitionDuration: Duration.zero,
+    pageBuilder: (ctx, anim1, anim2) => builder(ctx),
+    transitionBuilder: (ctx, anim1, anim2, child) => child,
+  );
+}
+
 /// Shows a standardized retro arcade confirmation modal dialog.
 Future<bool?> showArcadeConfirmDialog({
   required BuildContext context,
@@ -12,7 +30,7 @@ Future<bool?> showArcadeConfirmDialog({
   Color confirmColor = AppPalette.warningRed,
 }) async {
   AudioManager.instance.playSfx('unlock.wav');
-  return showDialog<bool>(
+  return showArcadeDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: AppPalette.yellowBackground,
