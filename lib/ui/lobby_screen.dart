@@ -63,7 +63,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
         ArcadePageRoute(
           page: GameScreen(levelNumber: _net.selectedLevel),
         ),
-      );
+      ).then((_) {
+        if (mounted) setState(() {});
+      });
     }
   }
 
@@ -186,7 +188,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      '2–5 Players Local Hotspot / Wi-Fi',
+                      '1v1 Local Hotspot / Wi-Fi Race (Coin + Time Scoring)',
                       style: TextStyle(
                         fontFamily: 'AtkinsonHyperlegible',
                         fontSize: 15,
@@ -312,273 +314,299 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   Widget _buildHostView() {
-    final isHosting = _net.isConnected.value && _net.isHost;
+    return ValueListenableBuilder<bool>(
+      valueListenable: _net.isConnected,
+      builder: (context, connected, _) {
+        final isHosting = connected && _net.isHost;
 
-    return Container(
-      width: 520,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppPalette.yellowBackground,
-        border: Border.all(color: AppPalette.brownSolid, width: 2.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // IP display banner
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppPalette.yellowBackground,
-              border: Border.all(color: AppPalette.brownSolid, width: 1.5),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        return Container(
+          width: 520,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppPalette.yellowBackground,
+            border: Border.all(color: AppPalette.brownSolid, width: 2.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // IP display banner
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppPalette.yellowBackground,
+                  border: Border.all(color: AppPalette.brownSolid, width: 1.5),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'HOST IP ADDRESS:',
-                      style: TextStyle(
-                        fontFamily: 'PressStart2P',
-                        fontSize: 10,
-                        color: AppPalette.textDark,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'HOST IP ADDRESS:',
+                          style: TextStyle(
+                            fontFamily: 'PressStart2P',
+                            fontSize: 10,
+                            color: AppPalette.textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$_hostIp:${NetManager.defaultPort}',
+                          style: const TextStyle(
+                            fontFamily: 'PressStart2P',
+                            fontSize: 13,
+                            color: AppPalette.playerBlack,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$_hostIp:${NetManager.defaultPort}',
-                      style: const TextStyle(
-                        fontFamily: 'PressStart2P',
-                        fontSize: 13,
-                        color: AppPalette.playerBlack,
-                      ),
+                    IconButton(
+                      icon: const Icon(Icons.copy, size: 20, color: AppPalette.brownSolid),
+                      tooltip: 'Copy IP',
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: _hostIp));
+                        showArcadeToast(
+                          context,
+                          message: 'Host IP copied to clipboard!',
+                          icon: Icons.copy_sharp,
+                        );
+                      },
                     ),
                   ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.copy, size: 20, color: AppPalette.brownSolid),
-                  tooltip: 'Copy IP',
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: _hostIp));
-                    showArcadeToast(
-                      context,
-                      message: 'Host IP copied to clipboard!',
-                      icon: Icons.copy_sharp,
+              ),
+
+              const SizedBox(height: 12),
+
+              // Stage picker
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'STAGE:',
+                    style: TextStyle(
+                      fontFamily: 'PressStart2P',
+                      fontSize: 11,
+                      color: AppPalette.playerBlack,
+                    ),
+                  ),
+                  Row(
+                    children: List.generate(5, (index) {
+                      final lvl = index + 1;
+                      final isSel = _selectedLevel == lvl;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() => _selectedLevel = lvl);
+                          _net.setSelectedLevel(lvl);
+                        },
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          margin: const EdgeInsets.only(left: 6),
+                          decoration: BoxDecoration(
+                            color: isSel ? AppPalette.brownSolid : AppPalette.yellowBackground,
+                            border: Border.all(color: AppPalette.playerBlack, width: 2),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '$lvl',
+                            style: TextStyle(
+                              fontFamily: 'PressStart2P',
+                              fontSize: 12,
+                              color: isSel ? Colors.white : AppPalette.playerBlack,
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              // Host / Start button
+              if (!isHosting)
+                SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppPalette.brownSolid,
+                      foregroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(
+                        side: BorderSide(color: AppPalette.playerBlack, width: 2),
+                      ),
+                    ),
+                    onPressed: _handleStartHost,
+                    child: const Text(
+                      'CREATE LOBBY',
+                      style: TextStyle(fontFamily: 'PressStart2P', fontSize: 12),
+                    ),
+                  ),
+                )
+              else ...[
+                _buildPlayerList(),
+                const SizedBox(height: 12),
+                ValueListenableBuilder<Map<String, String>>(
+                  valueListenable: _net.players,
+                  builder: (context, playersMap, _) {
+                    final readyToStart = playersMap.length >= 2;
+                    return SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: readyToStart ? AppPalette.brownDark : Colors.grey,
+                          foregroundColor: Colors.white,
+                          shape: const RoundedRectangleBorder(
+                            side: BorderSide(color: AppPalette.playerBlack, width: 2),
+                          ),
+                        ),
+                        onPressed: readyToStart
+                            ? () {
+                                AudioManager.instance.playSfx('unlock.wav');
+                                _net.startMatch(level: _selectedLevel);
+                              }
+                            : null,
+                        child: Text(
+                          readyToStart
+                              ? 'START MATCH (2/2)'
+                              : 'WAITING FOR RIVAL (${playersMap.length}/2)',
+                          style: const TextStyle(fontFamily: 'PressStart2P', fontSize: 12),
+                        ),
+                      ),
                     );
                   },
                 ),
               ],
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Stage picker
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'STAGE:',
-                style: TextStyle(
-                  fontFamily: 'PressStart2P',
-                  fontSize: 11,
-                  color: AppPalette.playerBlack,
-                ),
-              ),
-              Row(
-                children: List.generate(5, (index) {
-                  final lvl = index + 1;
-                  final isSel = _selectedLevel == lvl;
-                  return GestureDetector(
-                    onTap: isHosting
-                        ? null
-                        : () => setState(() => _selectedLevel = lvl),
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      margin: const EdgeInsets.only(left: 6),
-                      decoration: BoxDecoration(
-                        color: isSel ? AppPalette.brownSolid : AppPalette.yellowBackground,
-                        border: Border.all(color: AppPalette.playerBlack, width: 2),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '$lvl',
-                        style: TextStyle(
-                          fontFamily: 'PressStart2P',
-                          fontSize: 12,
-                          color: isSel ? Colors.white : AppPalette.playerBlack,
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ),
             ],
           ),
-
-          const SizedBox(height: 14),
-
-          // Host / Start button
-          if (!isHosting)
-            SizedBox(
-              height: 44,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppPalette.brownSolid,
-                  foregroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(
-                    side: BorderSide(color: AppPalette.playerBlack, width: 2),
-                  ),
-                ),
-                onPressed: _handleStartHost,
-                child: const Text(
-                  'CREATE LOBBY',
-                  style: TextStyle(fontFamily: 'PressStart2P', fontSize: 12),
-                ),
-              ),
-            )
-          else ...[
-            _buildPlayerList(),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 44,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppPalette.brownDark,
-                  foregroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(
-                    side: BorderSide(color: AppPalette.playerBlack, width: 2),
-                  ),
-                ),
-                onPressed: () {
-                  AudioManager.instance.playSfx('unlock.wav');
-                  _net.startMatch(level: _selectedLevel);
-                },
-                child: Text(
-                  'START MATCH (${_net.players.value.length}/5)',
-                  style: const TextStyle(fontFamily: 'PressStart2P', fontSize: 12),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildJoinView() {
-    final isConnected = _net.isConnected.value && !_net.isHost;
+    return ValueListenableBuilder<bool>(
+      valueListenable: _net.isConnected,
+      builder: (context, connected, _) {
+        final isConnected = connected && !_net.isHost;
 
-    return Container(
-      width: 520,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppPalette.yellowBackground,
-        border: Border.all(color: AppPalette.brownSolid, width: 2.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (!isConnected) ...[
-            // IP Input
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppPalette.yellowBackground,
-                border: Border.all(color: AppPalette.brownSolid, width: 2),
-              ),
-              child: TextField(
-                controller: _ipController,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  hintText: 'Enter Host IP (e.g. 192.168.1.5)',
-                  isDense: true,
-                ),
-                style: const TextStyle(
-                  fontFamily: 'PressStart2P',
-                  fontSize: 12,
-                  color: AppPalette.playerBlack,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // Connect button
-            SizedBox(
-              height: 44,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppPalette.brownSolid,
-                  foregroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(
-                    side: BorderSide(color: AppPalette.playerBlack, width: 2),
+        return Container(
+          width: 520,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppPalette.yellowBackground,
+            border: Border.all(color: AppPalette.brownSolid, width: 2.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!isConnected) ...[
+                // IP Input
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppPalette.yellowBackground,
+                    border: Border.all(color: AppPalette.brownSolid, width: 2),
                   ),
-                ),
-                onPressed: _isConnecting ? null : _handleConnectGuest,
-                child: _isConnecting
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
-                        ),
-                      )
-                    : const Text(
-                        'CONNECT TO HOST',
-                        style: TextStyle(fontFamily: 'PressStart2P', fontSize: 12),
-                      ),
-              ),
-            ),
-          ] else ...[
-            // Connected state
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppPalette.yellowBackground,
-                border: Border.all(color: AppPalette.brownSolid, width: 2),
-              ),
-              child: Column(
-                children: [
-                  const Text(
-                    'CONNECTED TO HOST!',
-                    style: TextStyle(
+                  child: TextField(
+                    controller: _ipController,
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      hintText: 'Enter Host IP (e.g. 192.168.1.5)',
+                      isDense: true,
+                    ),
+                    style: const TextStyle(
                       fontFamily: 'PressStart2P',
                       fontSize: 12,
                       color: AppPalette.playerBlack,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Stage: ${_net.selectedLevel}',
-                    style: const TextStyle(
-                      fontFamily: 'AtkinsonHyperlegible',
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: AppPalette.textDark,
+                ),
+                const SizedBox(height: 14),
+
+                // Connect button
+                SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppPalette.brownSolid,
+                      foregroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(
+                        side: BorderSide(color: AppPalette.playerBlack, width: 2),
+                      ),
+                    ),
+                    onPressed: _isConnecting ? null : _handleConnectGuest,
+                    child: _isConnecting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : const Text(
+                            'CONNECT TO HOST',
+                            style: TextStyle(fontFamily: 'PressStart2P', fontSize: 12),
+                          ),
+                  ),
+                ),
+              ] else ...[
+                // Connected state
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppPalette.yellowBackground,
+                    border: Border.all(color: AppPalette.brownSolid, width: 2),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'CONNECTED TO HOST!',
+                        style: TextStyle(
+                          fontFamily: 'PressStart2P',
+                          fontSize: 12,
+                          color: AppPalette.playerBlack,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ValueListenableBuilder<Map<String, String>>(
+                        valueListenable: _net.players,
+                        builder: (context, players, child) {
+                          return Text(
+                            'Stage: ${_net.selectedLevel}',
+                            style: const TextStyle(
+                              fontFamily: 'AtkinsonHyperlegible',
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppPalette.textDark,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildPlayerList(),
+                const SizedBox(height: 12),
+                const Center(
+                  child: Text(
+                    'Waiting for host to start...',
+                    style: TextStyle(
+                      fontFamily: 'PressStart2P',
+                      fontSize: 10,
+                      color: AppPalette.brownDark,
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildPlayerList(),
-            const SizedBox(height: 12),
-            const Center(
-              child: Text(
-                'Waiting for host to start...',
-                style: TextStyle(
-                  fontFamily: 'PressStart2P',
-                  fontSize: 10,
-                  color: AppPalette.brownDark,
                 ),
-              ),
-            ),
-          ],
-        ],
-      ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -598,7 +626,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'PLAYERS IN LOBBY (${entries.length}/5):',
+                'PLAYERS IN LOBBY (${entries.length}/2):',
                 style: const TextStyle(
                   fontFamily: 'PressStart2P',
                   fontSize: 10,
@@ -606,7 +634,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              ...List.generate(5, (i) {
+              ...List.generate(2, (i) {
                 if (i < entries.length) {
                   final isHostSlot = entries[i].key == '1';
                   final isMe = entries[i].key == _net.localPlayerId;
@@ -643,7 +671,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Waiting for player...',
+                          'Waiting for rival...',
                           style: TextStyle(
                             fontFamily: 'AtkinsonHyperlegible',
                             fontSize: 14,

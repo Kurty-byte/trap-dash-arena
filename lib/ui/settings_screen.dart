@@ -17,7 +17,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final TextEditingController _nameController;
   late final FocusNode _nameFocusNode;
   bool _highContrast = GameState.instance.highContrastTells;
-  bool _aiBot = GameState.instance.aiBotEnabled;
 
   @override
   void initState() {
@@ -111,23 +110,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                           const SizedBox(height: 12),
 
-                          // Row 2: High Contrast & AI Bot
-                          IntrinsicHeight(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // High-Contrast Trap Tells Toggle Box
-                                Expanded(
-                                  child: _buildHighContrastTile(),
-                                ),
-                                const SizedBox(width: 12),
-                                // AI Pace-Bot Rival Toggle Box
-                                Expanded(
-                                  child: _buildAiBotTile(),
-                                ),
-                              ],
-                            ),
-                          ),
+                          // Row 2: High Contrast Trap Tells
+                          _buildHighContrastTile(),
 
                           const SizedBox(height: 14),
 
@@ -293,40 +277,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildAiBotTile() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppPalette.yellowBackground,
-        border: Border.all(color: AppPalette.brownSolid, width: 2),
-      ),
-      child: SquareToggleListTile(
-        title: const Text(
-          'Offline Pace-Bot Rival',
-          style: TextStyle(
-            fontFamily: 'AtkinsonHyperlegible',
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: AppPalette.playerBlack,
-          ),
-        ),
-        subtitle: const Text(
-          'Simulates live opponent in solo run',
-          style: TextStyle(
-            fontFamily: 'AtkinsonHyperlegible',
-            fontSize: 13,
-            color: AppPalette.brownDark,
-          ),
-        ),
-        value: _aiBot,
-        onChanged: (val) {
-          setState(() => _aiBot = val);
-          GameState.instance.setAiBotEnabled(val);
-        },
-      ),
-    );
-  }
-
   Widget _buildResetProgressButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
@@ -350,7 +300,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (context.mounted) {
               setState(() {
                 _highContrast = GameState.instance.highContrastTells;
-                _aiBot = GameState.instance.aiBotEnabled;
                 _nameController.text = GameState.instance.playerNickname;
               });
               showArcadeToast(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:trap_dash_arena/autoload/audio_manager.dart';
+import 'package:trap_dash_arena/autoload/game_state.dart';
+import 'package:trap_dash_arena/autoload/net_manager.dart';
 import 'package:trap_dash_arena/autoload/palette.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
 import 'package:trap_dash_arena/ui/main_menu_screen.dart';
@@ -59,17 +61,19 @@ class PauseOverlay extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
 
-                  // Restart button
-                  _buildButton(
-                    label: 'RESTART',
-                    color: AppPalette.brownDark,
-                    textColor: Colors.white,
-                    onTap: () {
-                      AudioManager.instance.playSfx('unlock.wav');
-                      game.restartLevel();
-                    },
-                  ),
-                  const SizedBox(height: 12),
+                  // Restart button (offline only)
+                  if (GameState.instance.mode != 'online') ...[
+                    _buildButton(
+                      label: 'RESTART',
+                      color: AppPalette.brownDark,
+                      textColor: Colors.white,
+                      onTap: () {
+                        AudioManager.instance.playSfx('unlock.wav');
+                        game.restartLevel();
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
                   // Audio toggle
                   ValueListenableBuilder<bool>(
@@ -93,13 +97,18 @@ class PauseOverlay extends StatelessWidget {
                     label: 'QUIT TO MENU',
                     color: AppPalette.playerBlack,
                     textColor: Colors.white,
-                    onTap: () {
+                    onTap: () async {
                       AudioManager.instance.playSfx('unlock.wav');
                       game.resumeEngine();
-                      Navigator.of(context).pushAndRemoveUntil(
-                        ArcadePageRoute(page: const MainMenuScreen()),
-                        (route) => false,
-                      );
+                      if (GameState.instance.mode == 'online') {
+                        await NetManager.instance.disconnect();
+                      }
+                      if (context.mounted) {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          ArcadePageRoute(page: const MainMenuScreen()),
+                          (route) => false,
+                        );
+                      }
                     },
                   ),
                 ],

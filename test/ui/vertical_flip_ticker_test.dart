@@ -67,4 +67,48 @@ void main() {
     expect(find.text(longMessage), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('VerticalFlipTicker defaultMessages contain accurate Levels 1-5 trap mechanics',
+      (WidgetTester tester) async {
+    expect(VerticalFlipTicker.defaultMessages.length, greaterThanOrEqualTo(7));
+    expect(
+      VerticalFlipTicker.defaultMessages,
+      contains('TIP: FLOOR GAPS CHASE RUNNERS AND SNAP IF YOU HESITATE'),
+    );
+    expect(
+      VerticalFlipTicker.defaultMessages,
+      contains('WARNING: SOME SPIKES LAUNCH UP ON JUMP — WALK UNDER THEM'),
+    );
+    expect(
+      VerticalFlipTicker.defaultMessages,
+      contains('HINT: WATCH THE OVERHEAD ARROW WHEN CONTROLS INVERT'),
+    );
+    expect(
+      VerticalFlipTicker.defaultMessages,
+      contains('PRO TIP: SOME WARP PORTALS ARM SPIKES BEHIND YOU'),
+    );
+    expect(
+      VerticalFlipTicker.defaultMessages,
+      contains('MEMORIZE: PORTAL GAUNTLET PATTERN IS L - R - R - L - R'),
+    );
+    expect(
+      VerticalFlipTicker.defaultMessages,
+      contains('FACT: RED BUTTONS SHUT DOWN CANNONS IN LEVEL 5'),
+    );
+    expect(
+      VerticalFlipTicker.defaultMessages,
+      contains('WARNING: GIANT SAW BLADES LEAP WHEN YOU GET CLOSE'),
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: VerticalFlipTicker(),
+        ),
+      ),
+    );
+
+    expect(find.text(VerticalFlipTicker.defaultMessages.first), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

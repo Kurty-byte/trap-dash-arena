@@ -22,20 +22,20 @@ void main() {
   });
 
   group('SettingsScreen One-Frame Layout & Retro Arcade Toast Tests', () {
-    testWidgets('SettingsScreen is non-scrollable and fits all 5 controls in one frame', (tester) async {
+    testWidgets('SettingsScreen is non-scrollable and fits controls in one frame', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: SettingsScreen()));
       await tester.pumpAndSettle();
 
       // No SingleChildScrollView
       expect(find.byType(SingleChildScrollView), findsNothing);
 
-      // Verify all 5 controls are present and visible simultaneously
+      // Verify controls are present and visible simultaneously
       expect(find.text('SETTINGS'), findsOneWidget);
       expect(find.text('Player Name'), findsOneWidget);
       expect(find.byType(TextField), findsOneWidget);
       expect(find.widgetWithText(SquareToggleListTile, 'Sound & Music'), findsOneWidget);
       expect(find.widgetWithText(SquareToggleListTile, 'High-Contrast Trap Tells'), findsOneWidget);
-      expect(find.widgetWithText(SquareToggleListTile, 'Offline Pace-Bot Rival'), findsOneWidget);
+      expect(find.widgetWithText(SquareToggleListTile, 'Offline Pace-Bot Rival'), findsNothing);
       expect(find.text('RESET ALL PROGRESS'), findsOneWidget);
     });
 
@@ -101,14 +101,12 @@ void main() {
       // Set initial state
       await GameState.instance.setPlayerNickname('Ace');
       await GameState.instance.setHighContrastTells(true);
-      await GameState.instance.setAiBotEnabled(true);
       await GameState.instance.completeLevel(1, 3);
       await GameState.instance.completeLevel(2, 3);
 
       expect(GameState.instance.unlockedLevel, 3);
       expect(GameState.instance.playerNickname, 'Ace');
       expect(GameState.instance.highContrastTells, isTrue);
-      expect(GameState.instance.aiBotEnabled, isTrue);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -145,7 +143,6 @@ void main() {
       expect(find.text('Runner'), findsOneWidget);
       expect(GameState.instance.unlockedLevel, 1);
       expect(GameState.instance.highContrastTells, isFalse);
-      expect(GameState.instance.aiBotEnabled, isFalse);
 
       // Tap back button to exit settings screen (triggers dispose)
       await tester.tap(find.byType(SquareBackButton));

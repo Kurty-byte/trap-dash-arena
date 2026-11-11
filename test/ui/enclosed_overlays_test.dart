@@ -1,6 +1,8 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trap_dash_arena/autoload/game_state.dart';
+import 'package:trap_dash_arena/autoload/net_manager.dart';
 import 'package:trap_dash_arena/game/actors/player.dart';
 import 'package:trap_dash_arena/game/level_config.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
@@ -263,5 +265,242 @@ void main() {
     await tester.tapAt(restartPos);
     await tester.pump();
     expect(find.byType(ResultOverlay), findsOneWidget);
+  });
+
+  testWidgets('HudOverlay platform progress squares are centered at x=640 on 1280px viewport regardless of dev mode',
+      (tester) async {
+    tester.view.physicalSize = const Size(1280, 720);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final game = TrapDashGame(initialLevelNumber: 1);
+    game.controller.startLevel(LevelConfig.get(1));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1280,
+            height: 720,
+            child: Stack(
+              children: [
+                HudOverlay(game: game),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Square 2 is the exact center of the 3-square row (Square 1, Square 2, Square 3)
+    final square2Center = tester.getCenter(find.byKey(const Key('hud_platform_square_2')));
+    expect(square2Center.dx, equals(640.0));
+
+    // Toggle Dev Mode (adds DEV ∞ badge on left, hides timer on right)
+    final heartsToggle = find.byKey(const Key('hud_dev_hearts_toggle'));
+    await tester.tap(heartsToggle);
+    await tester.pump();
+
+    // Center must remain invariant at x = 640.0
+    final square2CenterAfterDev = tester.getCenter(find.byKey(const Key('hud_platform_square_2')));
+    expect(square2CenterAfterDev.dx, equals(640.0));
+  });
+
+  testWidgets('ResultOverlay displays ARENA CONQUERED, star message, and confetti on Level 5 completion',
+      (tester) async {
+    final game = TrapDashGame(initialLevelNumber: 5);
+    game.controller.startLevel(LevelConfig.get(5));
+    game.controller.endLevel(true);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1280,
+            height: 720,
+            child: Stack(
+              children: [
+                ResultOverlay(game: game),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Level 5 Grand Finale banner & message
+    expect(find.text('ARENA CONQUERED!'), findsOneWidget);
+    expect(find.text('VICTORY!'), findsNothing);
+    expect(find.byKey(const Key('level5_finale_message')), findsOneWidget);
+    expect(find.byKey(const Key('arcade_confetti_overlay')), findsOneWidget);
+
+    // Verify NEXT button is omitted on Level 5
+    expect(find.widgetWithText(ElevatedButton, 'NEXT'), findsNothing);
+    expect(find.widgetWithText(ElevatedButton, 'RETRY'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'MENU'), findsOneWidget);
+
+    // Verify Level 1 win still displays VICTORY! and does not mount confetti
+    final gameL1 = TrapDashGame(initialLevelNumber: 1);
+    gameL1.controller.startLevel(LevelConfig.get(1));
+    gameL1.controller.endLevel(true);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1280,
+            height: 720,
+            child: Stack(
+              children: [
+                ResultOverlay(game: gameL1),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('VICTORY!'), findsOneWidget);
+    expect(find.text('ARENA CONQUERED!'), findsNothing);
+    expect(find.byKey(const Key('arcade_confetti_overlay')), findsNothing);
+    expect(find.widgetWithText(ElevatedButton, 'NEXT'), findsOneWidget);
+  });
+
+  testWidgets('HudOverlay in online mode hides quick restart, shows coin counter and 1v1 rival bar',
+      (tester) async {
+    GameState.instance.setMode('online');
+    addTearDown(() => GameState.instance.setMode('offline'));
+
+    final game = TrapDashGame(initialLevelNumber: 1);
+    game.controller.startLevel(LevelConfig.get(1));
+
+    NetManager.instance.players.value = {
+      '1': 'Alice',
+      '2': 'Bob',
+    };
+    NetManager.instance.playerScores.value = {
+      '1': 200,
+      '2': 300,
+    };
+    NetManager.instance.playerCoins.value = {
+      '1': 2,
+      '2': 3,
+    };
+    addTearDown(() => NetManager.instance.disconnect());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1280,
+            height: 720,
+            child: Stack(
+              children: [
+                HudOverlay(game: game),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Quick restart button should be hidden in online mode
+    expect(find.byKey(const Key('hud_restart_button')), findsNothing);
+    expect(find.byKey(const Key('hud_pause_button')), findsOneWidget);
+
+    // Online coins counter should be visible
+    expect(find.text('0/6'), findsOneWidget);
+
+    // 1v1 rival leaderboard text should be visible
+    expect(find.textContaining('YOU (Alice): 200 PTS 🪙2/6'), findsOneWidget);
+    expect(find.textContaining('RIVAL (Bob): 300 PTS 🪙3/6'), findsOneWidget);
+  });
+
+  testWidgets('PauseOverlay in online mode hides RESTART button', (tester) async {
+    GameState.instance.setMode('online');
+    addTearDown(() => GameState.instance.setMode('offline'));
+
+    final game = TrapDashGame(initialLevelNumber: 1);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1280,
+            height: 720,
+            child: Stack(
+              children: [
+                PauseOverlay(game: game),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.widgetWithText(ElevatedButton, 'RESUME'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'RESTART'), findsNothing);
+    expect(find.widgetWithText(ElevatedButton, 'QUIT TO MENU'), findsOneWidget);
+  });
+
+  testWidgets('ResultOverlay in online mode renders 1v1 breakdown and BACK TO LOBBY',
+      (tester) async {
+    GameState.instance.setMode('online');
+    addTearDown(() => GameState.instance.setMode('offline'));
+
+    final game = TrapDashGame(initialLevelNumber: 1);
+    game.controller.startLevel(LevelConfig.get(1));
+
+    NetManager.instance.localPlayerId = '1';
+    NetManager.instance.matchWinnerId.value = '1';
+    NetManager.instance.isConnected.value = true;
+    NetManager.instance.finalScoreboard.value = [
+      {
+        'id': '1',
+        'name': 'Hero',
+        'score': 850,
+        'coins': 5,
+        'timeBonus': 350,
+        'timeLeft': 35.0,
+        'won': true,
+      },
+      {
+        'id': '2',
+        'name': 'Rival',
+        'score': 400,
+        'coins': 4,
+        'timeBonus': 0,
+        'timeLeft': 0.0,
+        'won': false,
+      },
+    ];
+    addTearDown(() => NetManager.instance.disconnect());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1280,
+            height: 720,
+            child: Stack(
+              children: [
+                ResultOverlay(game: game),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('MATCH VICTORY!'), findsOneWidget);
+    expect(find.text('1v1 MATCH BREAKDOWN:'), findsOneWidget);
+    expect(find.textContaining('YOU (Hero)'), findsOneWidget);
+    expect(find.textContaining('850 PTS'), findsOneWidget);
+    expect(find.textContaining('🪙 Coins: 5/6 (+500 PTS)'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'BACK TO LOBBY'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'EXIT TO MENU'), findsOneWidget);
   });
 }

@@ -6,17 +6,9 @@ import 'package:trap_dash_arena/ui/level_select_screen.dart';
 import 'package:trap_dash_arena/ui/lobby_screen.dart';
 import 'package:trap_dash_arena/ui/widgets/arcade_page_route.dart';
 import 'package:trap_dash_arena/ui/widgets/square_back_button.dart';
-import 'package:trap_dash_arena/ui/widgets/square_toggle.dart';
 
-class ModeSelectScreen extends StatefulWidget {
+class ModeSelectScreen extends StatelessWidget {
   const ModeSelectScreen({super.key});
-
-  @override
-  State<ModeSelectScreen> createState() => _ModeSelectScreenState();
-}
-
-class _ModeSelectScreenState extends State<ModeSelectScreen> {
-  bool _aiBot = GameState.instance.aiBotEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -70,41 +62,18 @@ class _ModeSelectScreenState extends State<ModeSelectScreen> {
                                   color: AppPalette.playerBlack,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 10),
                               const Text(
-                                'Solo Campaign & Speedrun',
+                                'Solo Campaign & Speedrun\nOutsmart every chamber alone',
                                 style: TextStyle(
                                   fontFamily: 'AtkinsonHyperlegible',
                                   fontSize: 14,
                                   color: AppPalette.textDark,
+                                  height: 1.3,
                                 ),
+                                textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 16),
-                              // AI Pace-Bot toggle
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Expanded(
-                                    child: Text(
-                                      'Pace-Bot Ghost Rival',
-                                      style: TextStyle(
-                                        fontFamily: 'AtkinsonHyperlegible',
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppPalette.textDark,
-                                      ),
-                                    ),
-                                  ),
-                                  SquareToggle(
-                                    value: _aiBot,
-                                    onChanged: (val) {
-                                      setState(() => _aiBot = val);
-                                      GameState.instance.setAiBotEnabled(val);
-                                    },
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 20),
                               SizedBox(
                                 width: double.infinity,
                                 height: 48,
@@ -161,7 +130,7 @@ class _ModeSelectScreenState extends State<ModeSelectScreen> {
                               ),
                               const SizedBox(height: 8),
                               const Text(
-                                '2–5 Players Hotspot / Wi-Fi',
+                                '1v1 Player Race (Hotspot / Wi-Fi)',
                                 style: TextStyle(
                                   fontFamily: 'AtkinsonHyperlegible',
                                   fontSize: 14,
