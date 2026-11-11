@@ -5,20 +5,17 @@ import 'package:trap_dash_arena/autoload/net_manager.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('NetManager Unit & Loopback Tests', () {
+  group('NetManager 1v1 Unit & Loopback Tests', () {
     late NetManager hostNet;
-    late NetManager guestNet;
     const testPort = 7788;
 
     setUp(() async {
       hostNet = NetManager.instance;
-      guestNet = NetManager.instance;
       await hostNet.disconnect();
     });
 
     tearDown(() async {
       await hostNet.disconnect();
-      await guestNet.disconnect();
     });
 
     test('getLocalIp returns non-empty IPv4 string', () async {
@@ -27,7 +24,7 @@ void main() {
       expect(ip.contains('.'), isTrue);
     });
 
-    test('Host starts session and initial state is populated', () async {
+    test('Host starts 1v1 session and initial state is populated', () async {
       await hostNet.startHost(
         nickname: 'HostTester',
         level: 2,
@@ -39,11 +36,22 @@ void main() {
       expect(hostNet.localPlayerId, equals('1'));
       expect(hostNet.players.value['1'], equals('HostTester'));
       expect(hostNet.playerScores.value['1'], equals(0));
+      expect(hostNet.playerCoins.value['1'], equals(0));
       expect(hostNet.selectedLevel, equals(2));
     });
 
+    test('Host setSelectedLevel broadcasts level update', () async {
+      await hostNet.startHost(
+        nickname: 'HostTester',
+        level: 1,
+        port: testPort,
+      );
+
+      hostNet.setSelectedLevel(4);
+      expect(hostNet.selectedLevel, equals(4));
+    });
+
     test('Unreachable host throws SocketException with exact wifi message', () async {
-      // Connect to non-existent server on unused loopback port with short timeout
       expect(
         () async => hostNet.joinGame(
           host: '127.0.0.1',
@@ -59,7 +67,7 @@ void main() {
       );
     });
 
-    test('Host and Guest complete loopback handshake and score synchronization', () async {
+    test('Host and Guest complete 1v1 loopback handshake, ghost sync, and match start', () async {
       final transportHost = LocalWsTransport();
       final transportGuest = LocalWsTransport();
 
@@ -67,12 +75,11 @@ void main() {
       host.setTransportForTesting(transportHost);
 
       await host.startHost(
-        nickname: 'AliceHost',
+        nickname: 'Runner',
         level: 1,
         port: 7789,
       );
 
-      // Create a second NetManager-like receiver using the guest transport
       final guestEvents = <Map<String, dynamic>>[];
       transportGuest.incomingEvents.listen(guestEvents.add);
 
@@ -83,29 +90,35 @@ void main() {
 
       expect(transportGuest.isConnected, isTrue);
 
-      // Guest sends join_lobby
+      // Guest sends join_lobby with duplicate nickname 'Runner'
       transportGuest.sendEvent({
         'type': 'join_lobby',
-        'nickname': 'BobGuest',
+        'nickname': 'Runner',
       });
 
-      // Wait for host to process
       await Future<void>.delayed(const Duration(milliseconds: 150));
 
+      // Guest is assigned ID '2' despite duplicate nickname
       expect(host.players.value.length, equals(2));
-      expect(host.players.value.values.contains('BobGuest'), isTrue);
+      expect(host.players.value['1'], equals('Runner'));
+      expect(host.players.value['2'], equals('Runner'));
 
-      // Guest reports score
+      // Guest sends 0.5s score_event with coins and coordinates
       transportGuest.sendEvent({
         'type': 'score_event',
         'playerId': '2',
-        'score': 350,
-        'progress': 0.75,
+        'score': 200,
+        'coins': 2,
+        'progress': 0.5,
+        'x': 540.0,
+        'y': 552.0,
       });
 
       await Future<void>.delayed(const Duration(milliseconds: 150));
-      expect(host.playerScores.value['2'], equals(350));
-      expect(host.playerProgress.value['2'], equals(0.75));
+      expect(host.playerScores.value['2'], equals(200));
+      expect(host.playerCoins.value['2'], equals(2));
+      expect(host.playerPositions.value['2']?.dx, equals(540.0));
+      expect(host.playerPositions.value['2']?.dy, equals(552.0));
 
       // Host starts match
       host.startMatch(level: 3);
@@ -125,43 +138,75 @@ void main() {
       expect(host.isConnected.value, isFalse);
     });
 
-    test('Winner adjudication sorts descending by score', () async {
+    test('1v1 Winner adjudication tie-breaker breaks by timeLeft or declares draw', () async {
       await hostNet.startHost(
         nickname: 'HostRunner',
         level: 1,
         port: 7790,
       );
 
-      // Simulate a guest in players map
       hostNet.players.value = {
         '1': 'HostRunner',
         '2': 'GuestRunner',
       };
-      hostNet.playerScores.value = {
-        '1': 300,
-        '2': 550,
-      };
 
-      // Both report finished
-      hostNet.reportFinished(score: 300, won: true);
+      // Player 1 finishes with 500 pts (faster: 35.5s left)
+      hostNet.reportFinished(
+        score: 500,
+        coins: 2,
+        timeBonus: 300,
+        timeLeft: 35.5,
+        won: true,
+      );
 
-      // Simulate guest finished event
-      final transportHost = LocalWsTransport();
-      hostNet.setTransportForTesting(transportHost);
+      // Simulate Player 2 incoming finished event with 500 pts (slower: 25.2s left)
+      hostNet.handleIncomingEventForTesting({
+        'type': 'player_finished',
+        'playerId': '2',
+        'score': 500,
+        'coins': 3,
+        'timeBonus': 200,
+        'timeLeft': 25.2,
+        'won': true,
+      });
 
-      // Call adjudication directly through reportFinished logic
+      // Player 1 wins tie-breaker because timeLeft is higher
+      expect(hostNet.matchWinnerId.value, equals('1'));
+      expect(hostNet.finalScoreboard.value?.length, equals(2));
+
+      await hostNet.disconnect();
+    });
+
+    test('1v1 Mid-match forfeit grants win to remaining player', () async {
+      await hostNet.startHost(
+        nickname: 'HostRunner',
+        level: 1,
+        port: 7791,
+      );
+
       hostNet.players.value = {
         '1': 'HostRunner',
         '2': 'GuestRunner',
       };
-      hostNet.playerScores.value = {
-        '1': 300,
-        '2': 550,
-      };
+      hostNet.isMatchStarted.value = true;
 
-      hostNet.reportFinished(score: 300, won: true);
+      // Simulate guest disconnects mid-match
+      hostNet.handleIncomingEventForTesting({
+        'type': 'peer_disconnected',
+        'playerId': '2',
+      });
 
-      // Disconnect
+      expect(hostNet.opponentDisconnected.value, isTrue);
+      expect(hostNet.matchWinnerId.value, equals('1'));
+      expect(hostNet.finalScoreboard.value, isNotNull);
+      expect(hostNet.finalScoreboard.value?.first['forfeit'], isTrue);
+
+      // Verify returnToLobby resets match state
+      hostNet.returnToLobby();
+      expect(hostNet.isMatchStarted.value, isFalse);
+      expect(hostNet.matchWinnerId.value, isNull);
+      expect(hostNet.finalScoreboard.value, isNull);
+
       await hostNet.disconnect();
     });
   });

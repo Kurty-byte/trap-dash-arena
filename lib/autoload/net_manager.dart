@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:trap_dash_arena/autoload/match_transport.dart';
 
@@ -34,6 +35,7 @@ class LocalWsTransport implements MatchTransport {
     _nextClientId = 2;
 
     _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
+    _server?.idleTimeout = null;
     _isConnected = true;
 
     _server!.listen(
@@ -181,13 +183,13 @@ class LocalWsTransport implements MatchTransport {
   }
 }
 
-/// Singleton manager for 2–5 player real-time local multiplayer.
+/// Singleton manager for 1v1 (2-player) real-time local multiplayer ghost race.
 class NetManager {
   static final NetManager instance = NetManager._();
   NetManager._();
 
   static const int defaultPort = 7777;
-  static const int maxClients = 4; // 1 Host + 4 Guests = 5 players max
+  static const int maxClients = 1; // Strict 1v1: 1 Host + 1 Guest = 2 players max
   static const String errorWifiMessage =
       'Cannot reach host. Check that you are on the same Wi-Fi.';
 
@@ -203,15 +205,21 @@ class NetManager {
       ValueNotifier<Map<String, String>>({});
   final ValueNotifier<Map<String, int>> playerScores =
       ValueNotifier<Map<String, int>>({});
+  final ValueNotifier<Map<String, int>> playerCoins =
+      ValueNotifier<Map<String, int>>({});
   final ValueNotifier<Map<String, double>> playerProgress =
       ValueNotifier<Map<String, double>>({});
+  final ValueNotifier<Map<String, Offset>> playerPositions =
+      ValueNotifier<Map<String, Offset>>({});
   final ValueNotifier<bool> isConnected = ValueNotifier<bool>(false);
   final ValueNotifier<bool> isMatchStarted = ValueNotifier<bool>(false);
   final ValueNotifier<String?> matchWinnerId = ValueNotifier<String?>(null);
   final ValueNotifier<List<Map<String, dynamic>>?> finalScoreboard =
       ValueNotifier<List<Map<String, dynamic>>?>(null);
+  final ValueNotifier<bool> opponentDisconnected = ValueNotifier<bool>(false);
 
   final Set<String> _finishedPlayers = {};
+  final Map<String, Map<String, dynamic>> _finishDetails = {};
 
   bool get isHost => _transport.isHost;
 
@@ -219,6 +227,12 @@ class NetManager {
   @visibleForTesting
   void setTransportForTesting(MatchTransport customTransport) {
     _transport = customTransport;
+  }
+
+  /// Injects an incoming event for unit testing.
+  @visibleForTesting
+  void handleIncomingEventForTesting(Map<String, dynamic> event) {
+    _handleIncomingEvent(event);
   }
 
   /// Resolve local IPv4 address for hosting display.
@@ -251,13 +265,17 @@ class NetManager {
     localPlayerId = '1';
     selectedLevel = level;
     _finishedPlayers.clear();
+    _finishDetails.clear();
 
     players.value = {'1': nickname};
     playerScores.value = {'1': 0};
+    playerCoins.value = {'1': 0};
     playerProgress.value = {'1': 0.0};
+    playerPositions.value = {'1': Offset.zero};
     isMatchStarted.value = false;
     matchWinnerId.value = null;
     finalScoreboard.value = null;
+    opponentDisconnected.value = false;
 
     await _transport.hostSession(port: port, maxClients: maxClients);
     isConnected.value = true;
@@ -274,14 +292,19 @@ class NetManager {
     await disconnect();
 
     localNickname = nickname;
+    localPlayerId = '2'; // In 1v1 guest is always ID '2'
     _finishedPlayers.clear();
+    _finishDetails.clear();
 
     players.value = {};
     playerScores.value = {};
+    playerCoins.value = {};
     playerProgress.value = {};
+    playerPositions.value = {};
     isMatchStarted.value = false;
     matchWinnerId.value = null;
     finalScoreboard.value = null;
+    opponentDisconnected.value = false;
 
     try {
       await _transport.joinSession(
@@ -303,6 +326,14 @@ class NetManager {
     }
   }
 
+  /// Allows Host to change stage (1–5) and broadcast to Guest.
+  void setSelectedLevel(int level) {
+    selectedLevel = level;
+    if (isHost && isConnected.value) {
+      _broadcastLobbyState();
+    }
+  }
+
   void _listenToEvents() {
     _eventSubscription?.cancel();
     _eventSubscription = _transport.incomingEvents.listen(_handleIncomingEvent);
@@ -321,61 +352,91 @@ class NetManager {
   void _handleHostEvent(Map<String, dynamic> event, String? type) {
     switch (type) {
       case '_internal_client_connected':
-        // Waiting for join_lobby message from client
         break;
 
       case 'join_lobby':
-        final clientId = event['playerId'] as String?;
+        const clientId = '2';
         final clientNick = (event['nickname'] as String?) ?? 'Guest';
-        if (clientId != null) {
-          final updated = Map<String, String>.from(players.value);
-          updated[clientId] = clientNick;
-          players.value = updated;
+        final updated = Map<String, String>.from(players.value);
+        updated[clientId] = clientNick;
+        players.value = updated;
 
-          final updatedScores = Map<String, int>.from(playerScores.value);
-          updatedScores[clientId] = 0;
-          playerScores.value = updatedScores;
+        final updatedScores = Map<String, int>.from(playerScores.value);
+        updatedScores[clientId] = 0;
+        playerScores.value = updatedScores;
 
-          final updatedProg = Map<String, double>.from(playerProgress.value);
-          updatedProg[clientId] = 0.0;
-          playerProgress.value = updatedProg;
+        final updatedCoins = Map<String, int>.from(playerCoins.value);
+        updatedCoins[clientId] = 0;
+        playerCoins.value = updatedCoins;
 
-          // Broadcast updated lobby state to all clients
-          _broadcastLobbyState();
-        }
+        final updatedProg = Map<String, double>.from(playerProgress.value);
+        updatedProg[clientId] = 0.0;
+        playerProgress.value = updatedProg;
+
+        final updatedPos = Map<String, Offset>.from(playerPositions.value);
+        updatedPos[clientId] = Offset.zero;
+        playerPositions.value = updatedPos;
+
+        _broadcastLobbyState();
         break;
 
       case 'score_event':
-        final senderId = event['playerId'] as String?;
+        final senderId = event['playerId'] as String? ?? '2';
         final score = event['score'] as int? ?? 0;
+        final coins = event['coins'] as int? ?? 0;
         final prog = (event['progress'] as num?)?.toDouble() ?? 0.0;
-        if (senderId != null) {
-          final updatedScores = Map<String, int>.from(playerScores.value);
-          updatedScores[senderId] = score;
-          playerScores.value = updatedScores;
+        final x = (event['x'] as num?)?.toDouble();
+        final y = (event['y'] as num?)?.toDouble();
 
-          final updatedProg = Map<String, double>.from(playerProgress.value);
-          updatedProg[senderId] = prog;
-          playerProgress.value = updatedProg;
+        final updatedScores = Map<String, int>.from(playerScores.value);
+        updatedScores[senderId] = score;
+        playerScores.value = updatedScores;
 
-          // Relay score event to other clients
-          _transport.sendEvent(event);
+        final updatedCoins = Map<String, int>.from(playerCoins.value);
+        updatedCoins[senderId] = coins;
+        playerCoins.value = updatedCoins;
+
+        final updatedProg = Map<String, double>.from(playerProgress.value);
+        updatedProg[senderId] = prog;
+        playerProgress.value = updatedProg;
+
+        if (x != null && y != null) {
+          final updatedPos = Map<String, Offset>.from(playerPositions.value);
+          updatedPos[senderId] = Offset(x, y);
+          playerPositions.value = updatedPos;
         }
+
+        // Relay to guest
+        _transport.sendEvent(event);
         break;
 
       case 'player_finished':
-        final senderId = event['playerId'] as String?;
+        final senderId = event['playerId'] as String? ?? '2';
         final score = event['score'] as int? ?? 0;
-        if (senderId != null) {
-          _finishedPlayers.add(senderId);
-          final updatedScores = Map<String, int>.from(playerScores.value);
-          updatedScores[senderId] = score;
-          playerScores.value = updatedScores;
+        final coins = event['coins'] as int? ?? 0;
+        final timeBonus = event['timeBonus'] as int? ?? 0;
+        final timeLeft = (event['timeLeft'] as num?)?.toDouble() ?? 0.0;
+        final won = event['won'] as bool? ?? false;
 
-          // If all active players finished, announce winner
-          if (_finishedPlayers.length >= players.value.length) {
-            _adjudicateAndBroadcastWinner();
-          }
+        _finishedPlayers.add(senderId);
+        _finishDetails[senderId] = {
+          'score': score,
+          'coins': coins,
+          'timeBonus': timeBonus,
+          'timeLeft': timeLeft,
+          'won': won,
+        };
+
+        final updatedScores = Map<String, int>.from(playerScores.value);
+        updatedScores[senderId] = score;
+        playerScores.value = updatedScores;
+
+        final updatedCoins = Map<String, int>.from(playerCoins.value);
+        updatedCoins[senderId] = coins;
+        playerCoins.value = updatedCoins;
+
+        if (_finishedPlayers.length >= players.value.length) {
+          _adjudicateAndBroadcastWinner();
         }
         break;
 
@@ -393,14 +454,39 @@ class NetManager {
 
           if (!isMatchStarted.value) {
             _broadcastLobbyState();
-          } else {
-            _finishedPlayers.remove(droppedId);
-            if (_finishedPlayers.length >= players.value.length &&
-                players.value.isNotEmpty) {
-              _adjudicateAndBroadcastWinner();
-            }
+          } else if (finalScoreboard.value == null) {
+            // Mid-match forfeit: Guest left, Host wins automatically!
+            opponentDisconnected.value = true;
+            final board = [
+              {
+                'id': '1',
+                'name': localNickname,
+                'score': playerScores.value['1'] ?? 0,
+                'coins': playerCoins.value['1'] ?? 0,
+                'timeBonus': _finishDetails['1']?['timeBonus'] ?? 0,
+                'timeLeft': _finishDetails['1']?['timeLeft'] ?? 0.0,
+                'won': true,
+                'forfeit': true,
+              },
+              {
+                'id': '2',
+                'name': 'Guest',
+                'score': playerScores.value['2'] ?? 0,
+                'coins': playerCoins.value['2'] ?? 0,
+                'timeBonus': 0,
+                'timeLeft': 0.0,
+                'won': false,
+                'forfeit': true,
+              }
+            ];
+            matchWinnerId.value = '1';
+            finalScoreboard.value = board;
           }
         }
+        break;
+
+      case 'return_to_lobby':
+        returnToLobby();
         break;
     }
   }
@@ -413,17 +499,7 @@ class NetManager {
         rawPlayers.forEach((k, v) => parsed[k] = v.toString());
         players.value = parsed;
 
-        if (event.containsKey('assignedId')) {
-          localPlayerId = event['assignedId'].toString();
-        } else {
-          // Find own id by matching nickname if not explicitly assigned
-          for (final entry in parsed.entries) {
-            if (entry.value == localNickname) {
-              localPlayerId = entry.key;
-              break;
-            }
-          }
-        }
+        localPlayerId = event['assignedId']?.toString() ?? '2';
 
         if (event.containsKey('level')) {
           selectedLevel = event['level'] as int? ?? 1;
@@ -435,31 +511,52 @@ class NetManager {
         isMatchStarted.value = true;
         matchWinnerId.value = null;
         finalScoreboard.value = null;
+        opponentDisconnected.value = false;
         _finishedPlayers.clear();
+        _finishDetails.clear();
 
-        // Initialize score map
         final Map<String, int> scores = {};
+        final Map<String, int> coins = {};
         final Map<String, double> progs = {};
+        final Map<String, Offset> pos = {};
         for (final id in players.value.keys) {
           scores[id] = 0;
+          coins[id] = 0;
           progs[id] = 0.0;
+          pos[id] = Offset.zero;
         }
         playerScores.value = scores;
+        playerCoins.value = coins;
         playerProgress.value = progs;
+        playerPositions.value = pos;
         break;
 
       case 'score_event':
         final senderId = event['playerId'] as String?;
         final score = event['score'] as int? ?? 0;
+        final coins = event['coins'] as int? ?? 0;
         final prog = (event['progress'] as num?)?.toDouble() ?? 0.0;
+        final x = (event['x'] as num?)?.toDouble();
+        final y = (event['y'] as num?)?.toDouble();
+
         if (senderId != null) {
           final updatedScores = Map<String, int>.from(playerScores.value);
           updatedScores[senderId] = score;
           playerScores.value = updatedScores;
 
+          final updatedCoins = Map<String, int>.from(playerCoins.value);
+          updatedCoins[senderId] = coins;
+          playerCoins.value = updatedCoins;
+
           final updatedProg = Map<String, double>.from(playerProgress.value);
           updatedProg[senderId] = prog;
           playerProgress.value = updatedProg;
+
+          if (x != null && y != null) {
+            final updatedPos = Map<String, Offset>.from(playerPositions.value);
+            updatedPos[senderId] = Offset(x, y);
+            playerPositions.value = updatedPos;
+          }
         }
         break;
 
@@ -472,16 +569,41 @@ class NetManager {
         break;
 
       case 'peer_disconnected':
-        final droppedId = event['playerId'] as String?;
-        if (droppedId != null) {
-          final updated = Map<String, String>.from(players.value);
-          updated.remove(droppedId);
-          players.value = updated;
+      case '_internal_connection_closed':
+        if (isMatchStarted.value && finalScoreboard.value == null) {
+          // Mid-match forfeit: Host disconnected, Guest wins automatically!
+          opponentDisconnected.value = true;
+          final board = [
+            {
+              'id': localPlayerId,
+              'name': localNickname,
+              'score': playerScores.value[localPlayerId] ?? 0,
+              'coins': playerCoins.value[localPlayerId] ?? 0,
+              'timeBonus': _finishDetails[localPlayerId]?['timeBonus'] ?? 0,
+              'timeLeft': _finishDetails[localPlayerId]?['timeLeft'] ?? 0.0,
+              'won': true,
+              'forfeit': true,
+            },
+            {
+              'id': '1',
+              'name': players.value['1'] ?? 'Host',
+              'score': playerScores.value['1'] ?? 0,
+              'coins': playerCoins.value['1'] ?? 0,
+              'timeBonus': 0,
+              'timeLeft': 0.0,
+              'won': false,
+              'forfeit': true,
+            }
+          ];
+          matchWinnerId.value = localPlayerId;
+          finalScoreboard.value = board;
+        } else {
+          disconnect();
         }
         break;
 
-      case '_internal_connection_closed':
-        disconnect();
+      case 'return_to_lobby':
+        returnToLobby();
         break;
     }
   }
@@ -489,30 +611,39 @@ class NetManager {
   void _broadcastLobbyState() {
     _transport.sendEvent({
       'type': 'lobby_state',
+      'assignedId': '2',
       'level': selectedLevel,
       'players': players.value,
     });
   }
 
-  /// Host starts match for all connected peers.
+  /// Host starts match for both peers.
   void startMatch({int? level}) {
     if (!isHost) return;
 
     if (level != null) selectedLevel = level;
     final seed = DateTime.now().millisecondsSinceEpoch % 1000000;
     _finishedPlayers.clear();
+    _finishDetails.clear();
     isMatchStarted.value = true;
     matchWinnerId.value = null;
     finalScoreboard.value = null;
+    opponentDisconnected.value = false;
 
     final Map<String, int> scores = {};
+    final Map<String, int> coins = {};
     final Map<String, double> progs = {};
+    final Map<String, Offset> pos = {};
     for (final id in players.value.keys) {
       scores[id] = 0;
+      coins[id] = 0;
       progs[id] = 0.0;
+      pos[id] = Offset.zero;
     }
     playerScores.value = scores;
+    playerCoins.value = coins;
     playerProgress.value = progs;
+    playerPositions.value = pos;
 
     _transport.sendEvent({
       'type': 'start_match',
@@ -522,43 +653,81 @@ class NetManager {
     });
   }
 
-  /// Send local score & progress update.
-  void sendScore({required int score, required double progress}) {
+  /// Send local score, coins, progress, and position update (every 0.5s).
+  void sendScore({
+    required int score,
+    int coins = 0,
+    required double progress,
+    double? x,
+    double? y,
+  }) {
     if (!isConnected.value) return;
 
-    if (playerScores.value[localPlayerId] != score) {
-      final updatedScores = Map<String, int>.from(playerScores.value);
-      updatedScores[localPlayerId] = score;
-      playerScores.value = updatedScores;
-    }
+    final updatedScores = Map<String, int>.from(playerScores.value);
+    updatedScores[localPlayerId] = score;
+    playerScores.value = updatedScores;
 
-    if ((progress - (playerProgress.value[localPlayerId] ?? 0.0)).abs() >= 0.005) {
-      final updatedProg = Map<String, double>.from(playerProgress.value);
-      updatedProg[localPlayerId] = progress;
-      playerProgress.value = updatedProg;
+    final updatedCoins = Map<String, int>.from(playerCoins.value);
+    updatedCoins[localPlayerId] = coins;
+    playerCoins.value = updatedCoins;
+
+    final updatedProg = Map<String, double>.from(playerProgress.value);
+    updatedProg[localPlayerId] = progress;
+    playerProgress.value = updatedProg;
+
+    if (x != null && y != null) {
+      final updatedPos = Map<String, Offset>.from(playerPositions.value);
+      updatedPos[localPlayerId] = Offset(x, y);
+      playerPositions.value = updatedPos;
     }
 
     _transport.sendEvent({
       'type': 'score_event',
       'playerId': localPlayerId,
       'score': score,
+      'coins': coins,
       'progress': progress,
+      if (x != null && y != null) ...{
+        'x': x,
+        'y': y,
+      },
     });
   }
 
   /// Report local player finished or eliminated.
-  void reportFinished({required int score, required bool won}) {
+  void reportFinished({
+    required int score,
+    int coins = 0,
+    int timeBonus = 0,
+    double timeLeft = 0.0,
+    required bool won,
+  }) {
     if (!isConnected.value) return;
 
     _finishedPlayers.add(localPlayerId);
+    _finishDetails[localPlayerId] = {
+      'score': score,
+      'coins': coins,
+      'timeBonus': timeBonus,
+      'timeLeft': timeLeft,
+      'won': won,
+    };
+
     final updatedScores = Map<String, int>.from(playerScores.value);
     updatedScores[localPlayerId] = score;
     playerScores.value = updatedScores;
+
+    final updatedCoins = Map<String, int>.from(playerCoins.value);
+    updatedCoins[localPlayerId] = coins;
+    playerCoins.value = updatedCoins;
 
     _transport.sendEvent({
       'type': 'player_finished',
       'playerId': localPlayerId,
       'score': score,
+      'coins': coins,
+      'timeBonus': timeBonus,
+      'timeLeft': timeLeft,
       'won': won,
     });
 
@@ -570,16 +739,53 @@ class NetManager {
   void _adjudicateAndBroadcastWinner() {
     final List<Map<String, dynamic>> board = [];
     players.value.forEach((id, name) {
+      final details = _finishDetails[id] ?? {};
       board.add({
         'id': id,
         'name': name,
-        'score': playerScores.value[id] ?? 0,
+        'score': playerScores.value[id] ?? (details['score'] as int? ?? 0),
+        'coins': playerCoins.value[id] ?? (details['coins'] as int? ?? 0),
+        'timeBonus': details['timeBonus'] as int? ?? 0,
+        'timeLeft': (details['timeLeft'] as num?)?.toDouble() ?? 0.0,
+        'won': details['won'] as bool? ?? false,
       });
     });
 
-    // Sort descending by score
-    board.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
-    final winnerId = board.isNotEmpty ? board.first['id'] as String : '1';
+    // 1v1 Tie-breaker rule:
+    // 1. Highest score
+    // 2. If score tied: player who cleared the stage (won == true) beats eliminated player
+    // 3. If both won and score tied: player with higher unrounded timeLeft (faster clear)
+    // 4. If still tied: declare 'draw'
+    board.sort((a, b) {
+      final scoreCmp = (b['score'] as int).compareTo(a['score'] as int);
+      if (scoreCmp != 0) return scoreCmp;
+
+      final aWon = a['won'] as bool;
+      final bWon = b['won'] as bool;
+      if (aWon != bWon) return aWon ? -1 : 1;
+
+      final aTime = a['timeLeft'] as double;
+      final bTime = b['timeLeft'] as double;
+      final timeCmp = bTime.compareTo(aTime);
+      if (timeCmp != 0) return timeCmp;
+
+      return 0;
+    });
+
+    String winnerId = '1';
+    if (board.length >= 2) {
+      final p1 = board[0];
+      final p2 = board[1];
+      if (p1['score'] == p2['score'] &&
+          p1['won'] == p2['won'] &&
+          (p1['timeLeft'] as double) == (p2['timeLeft'] as double)) {
+        winnerId = 'draw';
+      } else {
+        winnerId = p1['id'] as String;
+      }
+    } else if (board.isNotEmpty) {
+      winnerId = board.first['id'] as String;
+    }
 
     matchWinnerId.value = winnerId;
     finalScoreboard.value = board;
@@ -589,6 +795,38 @@ class NetManager {
       'winnerId': winnerId,
       'scoreboard': board,
     });
+  }
+
+  /// Rematch: Reset match state so both players return to lobby cleanly.
+  void returnToLobby() {
+    isMatchStarted.value = false;
+    matchWinnerId.value = null;
+    finalScoreboard.value = null;
+    opponentDisconnected.value = false;
+    _finishedPlayers.clear();
+    _finishDetails.clear();
+
+    final Map<String, int> scores = {};
+    final Map<String, int> coins = {};
+    final Map<String, double> progs = {};
+    final Map<String, Offset> pos = {};
+    for (final id in players.value.keys) {
+      scores[id] = 0;
+      coins[id] = 0;
+      progs[id] = 0.0;
+      pos[id] = Offset.zero;
+    }
+    playerScores.value = scores;
+    playerCoins.value = coins;
+    playerProgress.value = progs;
+    playerPositions.value = pos;
+
+    if (isConnected.value) {
+      _transport.sendEvent({
+        'type': 'return_to_lobby',
+        'level': selectedLevel,
+      });
+    }
   }
 
   /// Disconnect and reset all state.
@@ -602,9 +840,13 @@ class NetManager {
     isMatchStarted.value = false;
     players.value = {};
     playerScores.value = {};
+    playerCoins.value = {};
     playerProgress.value = {};
+    playerPositions.value = {};
     matchWinnerId.value = null;
     finalScoreboard.value = null;
+    opponentDisconnected.value = false;
     _finishedPlayers.clear();
+    _finishDetails.clear();
   }
 }

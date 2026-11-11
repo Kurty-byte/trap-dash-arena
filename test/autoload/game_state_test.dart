@@ -68,14 +68,12 @@ void main() {
       await state.completeLevel(2, 2);
       await state.setHighContrastTells(true);
       await state.setPlayerNickname('Speedy');
-      await state.setAiBotEnabled(true);
 
       // Simulate app restart by clearing in-memory fields and calling init()
       state.unlockedLevel = 1;
       state.bestStars.clear();
       state.highContrastTells = false;
       state.playerNickname = 'Runner';
-      state.aiBotEnabled = false;
 
       await state.init();
 
@@ -84,7 +82,6 @@ void main() {
       expect(state.bestStars[2], equals(2));
       expect(state.highContrastTells, isTrue);
       expect(state.playerNickname, equals('Speedy'));
-      expect(state.aiBotEnabled, isTrue);
     });
   });
 }
