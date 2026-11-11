@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flame/components.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trap_dash_arena/game/actors/checkpoint_flag.dart';
@@ -439,6 +440,71 @@ void main() {
       expect(bridgeWarp.useCount, equals(0));
       expect(controller.step, equals(0));
       expect(player.controlsInverted, isFalse);
+    });
+
+    test('WarpPortal resolves postWarpSpikeTrapId dynamically and activates linked spike upon entry', () async {
+      final targetSpike = TrapSpike(
+        trapId: 'test_spike_target',
+        position: Vector2(500, 400),
+        behavior: SpikeBehavior.proximityPopUp,
+        hideCompletelyWhenIdle: true,
+        triggerDistance: 0.0,
+      );
+      game.world.add(targetSpike);
+
+      final portal = WarpPortal(
+        trapId: 'test_warp_portal',
+        position: Vector2(200, 600),
+        targetPosition: Vector2(300, 400),
+        postWarpSpikeTrapId: 'test_spike_target',
+      );
+      game.world.add(portal);
+      await game.ready();
+
+      expect(targetSpike.isExtended, isFalse);
+      expect(portal.postWarpSpikeToActivate, isNull);
+
+      // Resolve post-warp spike
+      final resolved = portal.resolvePostWarpSpike();
+      expect(resolved, equals(targetSpike));
+      expect(portal.postWarpSpikeToActivate, equals(targetSpike));
+
+      // Collision triggers warp and raises spike
+      portal.onCollisionStart({portal.position}, player);
+      expect(targetSpike.isExtended, isTrue);
+    });
+
+    test('Level04.tmx contains WarpPortals, TrapSpikes, and postWarpSpike wiring matching programmatic chamber', () {
+      final tmxFile = File('assets/tiles/Level04.tmx');
+      expect(tmxFile.existsSync(), isTrue);
+      final content = tmxFile.readAsStringSync();
+
+      expect(content.contains('roomCount" type="int" value="3"'), isTrue);
+      expect(content.contains('timeLimit" type="float" value="60.0"'), isTrue);
+
+      // Platform 1 spikes and warps with postWarpSpike wiring
+      expect(content.contains('name="TrapSpike" x="140" y="420"'), isTrue);
+      expect(content.contains('property name="trapId" value="l4_p1_pillar1_spike"'), isTrue);
+      expect(content.contains('name="WarpPortal" x="270" y="624"'), isTrue);
+      expect(content.contains('property name="trapId" value="l4_p1_warp1"'), isTrue);
+      expect(content.contains('property name="postWarpSpikeTrapId" value="l4_p1_pillar1_spike"'), isTrue);
+
+      expect(content.contains('name="TrapSpike" x="400" y="420"'), isTrue);
+      expect(content.contains('property name="trapId" value="l4_p1_pillar2_spike"'), isTrue);
+      expect(content.contains('name="WarpPortal" x="530" y="624"'), isTrue);
+      expect(content.contains('property name="trapId" value="l4_p1_warp2"'), isTrue);
+      expect(content.contains('property name="postWarpSpikeTrapId" value="l4_p1_pillar2_spike"'), isTrue);
+
+      expect(content.contains('name="WarpPortal" x="745" y="624"'), isTrue);
+      expect(content.contains('property name="trapId" value="l4_p1_warp3_trap"'), isTrue);
+
+      // Platform 2 & 3 elements in Level04.tmx
+      expect(content.contains('property name="trapId" value="l4_p2_bridge_warp"'), isTrue);
+      expect(content.contains('property name="trapId" value="l4_p2_bridge_spike"'), isTrue);
+      expect(content.contains('property name="trapId" value="l4_p2_upper_spike"'), isTrue);
+      expect(content.contains('property name="trapId" value="l4_p2_upper_warp"'), isTrue);
+      expect(content.contains('name="PortalGauntletController"'), isTrue);
+      expect(content.contains('name="ExitPortal" x="3620" y="400"'), isTrue);
     });
   });
 }

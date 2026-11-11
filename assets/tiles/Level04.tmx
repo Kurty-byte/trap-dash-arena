@@ -40,30 +40,41 @@
   <!-- Platform 1 Warps & Spikes -->
   <object id="17" name="TrapSpike" x="140" y="420" width="36" height="20">
    <properties>
+    <property name="trapId" value="l4_p1_pillar1_spike"/>
+    <property name="behavior" value="proximityPopUp"/>
     <property name="hideCompletelyWhenIdle" type="bool" value="true"/>
     <property name="triggerDistance" type="float" value="0.0"/>
    </properties>
   </object>
   <object id="18" name="WarpPortal" x="270" y="624" width="44" height="44">
    <properties>
+    <property name="trapId" value="l4_p1_warp1"/>
     <property name="targetX" type="float" value="400.0"/>
     <property name="targetY" type="float" value="420.0"/>
+    <property name="postWarpSpikeTrapId" value="l4_p1_pillar1_spike"/>
+    <property name="postWarpSpikeId" type="int" value="17"/>
    </properties>
   </object>
   <object id="19" name="TrapSpike" x="400" y="420" width="36" height="20">
    <properties>
+    <property name="trapId" value="l4_p1_pillar2_spike"/>
+    <property name="behavior" value="proximityPopUp"/>
     <property name="hideCompletelyWhenIdle" type="bool" value="true"/>
     <property name="triggerDistance" type="float" value="0.0"/>
    </properties>
   </object>
   <object id="20" name="WarpPortal" x="530" y="624" width="44" height="44">
    <properties>
+    <property name="trapId" value="l4_p1_warp2"/>
     <property name="targetX" type="float" value="660.0"/>
     <property name="targetY" type="float" value="420.0"/>
+    <property name="postWarpSpikeTrapId" value="l4_p1_pillar2_spike"/>
+    <property name="postWarpSpikeId" type="int" value="19"/>
    </properties>
   </object>
   <object id="21" name="WarpPortal" x="745" y="624" width="44" height="44">
    <properties>
+    <property name="trapId" value="l4_p1_warp3_trap"/>
     <property name="targetX" type="float" value="140.0"/>
     <property name="targetY" type="float" value="420.0"/>
    </properties>
@@ -71,6 +82,7 @@
   <!-- Platform 2 Warps & Spikes -->
   <object id="22" name="WarpPortal" x="1770" y="616" width="44" height="44">
    <properties>
+    <property name="trapId" value="l4_p2_bridge_warp"/>
     <property name="targetX" type="float" value="1910.0"/>
     <property name="targetY" type="float" value="552.0"/>
     <property name="pass1JumpShiftX" type="float" value="-38.0"/>
@@ -82,6 +94,8 @@
   </object>
   <object id="23" name="TrapSpike" x="1976" y="552" width="36" height="20">
    <properties>
+    <property name="trapId" value="l4_p2_bridge_spike"/>
+    <property name="behavior" value="proximityPopUp"/>
     <property name="triggerDistance" type="float" value="36.0"/>
     <property name="jitterDuration" type="float" value="0.08"/>
     <property name="hideCompletelyWhenIdle" type="bool" value="true"/>
@@ -89,6 +103,8 @@
   </object>
   <object id="24" name="TrapSpike" x="1828" y="340" width="36" height="20">
    <properties>
+    <property name="trapId" value="l4_p2_upper_spike"/>
+    <property name="behavior" value="proximityPopUp"/>
     <property name="triggerDistance" type="float" value="36.0"/>
     <property name="jitterDuration" type="float" value="0.08"/>
     <property name="hideCompletelyWhenIdle" type="bool" value="true"/>
@@ -96,6 +112,7 @@
   </object>
   <object id="25" name="WarpPortal" x="1868" y="316" width="44" height="44">
    <properties>
+    <property name="trapId" value="l4_p2_upper_warp"/>
     <property name="targetX" type="float" value="2360.0"/>
     <property name="targetY" type="float" value="552.0"/>
     <property name="fleeTargetX" type="float" value="1668.0"/>

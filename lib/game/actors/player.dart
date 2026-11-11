@@ -242,14 +242,21 @@ class Player extends PositionComponent
     game.world.add(_activeWarpShardEffect!);
   }
 
-  void enterDoor(Vector2 doorPosition, {required VoidCallback onComplete}) {
-    if (isEnteringDoor || isInDeathCycle) return;
+  bool enterDoor(Vector2 doorPosition, {required VoidCallback onComplete}) {
+    if (isEnteringDoor ||
+        isInDeathCycle ||
+        isWarping ||
+        game.controller.isGameOver.value) {
+      return false;
+    }
     isEnteringDoor = true;
+    hitbox.collisionType = CollisionType.inactive;
     _doorAnimTimer = doorAnimDuration;
     _onDoorEnterComplete = onComplete;
     _doorTargetPos = doorPosition.clone();
     velocity.setZero();
     _rawInputDirection = 0;
+    return true;
   }
 
   @override

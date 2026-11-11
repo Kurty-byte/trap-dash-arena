@@ -11,6 +11,7 @@ class WarpPortal extends PositionComponent
   final String trapId;
   Vector2 targetPosition;
   TrapSpike? postWarpSpikeToActivate;
+  final String? postWarpSpikeTrapId;
   bool? setControlsInvertedOnWarp;
 
   // Multi-pass bridge support (Platform 2)
@@ -46,6 +47,7 @@ class WarpPortal extends PositionComponent
     required Vector2 position,
     required this.targetPosition,
     this.postWarpSpikeToActivate,
+    this.postWarpSpikeTrapId,
     this.setControlsInvertedOnWarp,
     this.secondTargetPosition,
     this.secondSetControlsInvertedOnWarp,
@@ -162,6 +164,24 @@ class WarpPortal extends PositionComponent
     _shiftElapsed = 0.0;
   }
 
+  TrapSpike? resolvePostWarpSpike() {
+    if (postWarpSpikeToActivate != null) return postWarpSpikeToActivate;
+    if (postWarpSpikeTrapId != null) {
+      try {
+        for (final s in game.world.children.whereType<TrapSpike>()) {
+          if (s.trapId == postWarpSpikeTrapId ||
+              s.trapId == 's_$postWarpSpikeTrapId' ||
+              (postWarpSpikeTrapId!.startsWith('s_') &&
+                  s.trapId == postWarpSpikeTrapId!.substring(2))) {
+            postWarpSpikeToActivate = s;
+            return s;
+          }
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
   @override
   void onCollisionStart(
     Set<Vector2> intersectionPoints,
@@ -188,8 +208,9 @@ class WarpPortal extends PositionComponent
       game.shakeCamera(intensity: 6.0, duration: 0.18);
       game.controller.onTrapBait(trapId);
 
-      if (postWarpSpikeToActivate != null) {
-        postWarpSpikeToActivate!.thrustUp();
+      final spike = postWarpSpikeToActivate ?? resolvePostWarpSpike();
+      if (spike != null) {
+        spike.thrustUp();
       }
 
       _useCount++;

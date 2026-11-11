@@ -12,7 +12,11 @@ class ExitPortal extends PositionComponent
   Sprite? _doorSprite;
   Sprite? _teleportSprite;
   bool _isEntering = false;
+  bool get isEntering => _isEntering;
   double _openTimer = 0.0;
+
+  late final Vector2 _initialPosition;
+  late final bool _initialIsFakeFirst;
 
   ExitPortal({
     required Vector2 position,
@@ -22,7 +26,10 @@ class ExitPortal extends PositionComponent
           position: position,
           size: Vector2(45, 40),
           anchor: Anchor.bottomCenter,
-        );
+        ) {
+    _initialPosition = position.clone();
+    _initialIsFakeFirst = isFakeFirst;
+  }
 
   @override
   Future<void> onLoad() async {
@@ -51,6 +58,11 @@ class ExitPortal extends PositionComponent
   void update(double dt) {
     super.update(dt);
     if (_isEntering) {
+      if (game.player.isInDeathCycle || !game.player.isEnteringDoor) {
+        _isEntering = false;
+        _openTimer = 0.0;
+        return;
+      }
       _openTimer += dt;
     }
   }
@@ -62,7 +74,11 @@ class ExitPortal extends PositionComponent
   ) {
     super.onCollisionStart(intersectionPoints, other);
 
-    if (other is Player && !_isEntering) {
+    if (other is Player &&
+        !_isEntering &&
+        !other.isInDeathCycle &&
+        !other.isWarping &&
+        !game.controller.isGameOver.value) {
       if (isFakeFirst && realTargetPosition != null) {
         // Decoy portal jumps away to real platform!
         isFakeFirst = false;
@@ -76,18 +92,28 @@ class ExitPortal extends PositionComponent
       final collectedKeys = game.controller.keysCollected.value;
 
       if (collectedKeys >= requiredKeys) {
-        _isEntering = true;
-        game.audio.playSfx('win.wav');
-        other.enterDoor(
+        final entered = other.enterDoor(
           position,
           onComplete: () {
             game.controller.reachExitPortal();
           },
         );
+        if (entered) {
+          _isEntering = true;
+          _openTimer = 0.0;
+          game.audio.playSfx('win.wav');
+        }
       } else {
         game.audio.playSfx('trap_trigger.wav');
       }
     }
+  }
+
+  void resetToInitial() {
+    _isEntering = false;
+    _openTimer = 0.0;
+    isFakeFirst = _initialIsFakeFirst;
+    position.setFrom(_initialPosition);
   }
 
   @override

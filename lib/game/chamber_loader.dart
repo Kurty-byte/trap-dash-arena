@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flame/components.dart';
 import 'package:flame_tiled/flame_tiled.dart';
 import 'package:flutter/foundation.dart';
+import 'package:trap_dash_arena/autoload/game_state.dart';
 import 'package:trap_dash_arena/game/actors/arsenal_cannon.dart';
 import 'package:trap_dash_arena/game/actors/chamber_background.dart';
 import 'package:trap_dash_arena/game/actors/checkpoint_flag.dart';
@@ -52,32 +53,92 @@ class ChamberLoader {
     // 1. Always spawn outer solid enclosure walls with 3000px bleed margins
     _spawnPerimeterShell(game.world, roomCount: config.roomCount);
 
+    ChamberLoadResult? result;
+
     // In unit/widget tests, use fast programmatic chamber directly to avoid asset bundle timeouts
     if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
-      return _loadProgrammaticChamber(game, config.levelNumber);
-    }
-
-    // 2. Try loading from cached or fresh Tiled map, fall back to programmatic chamber
-    try {
-      RenderableTiledMap? map = _tmxCache[config.tmxFile];
-      if (map == null) {
-        map = await RenderableTiledMap.fromFile(
-          config.tmxFile,
-          Vector2.all(32),
-        );
-        _tmxCache[config.tmxFile] = map;
+      result = _loadProgrammaticChamber(game, config.levelNumber);
+    } else {
+      // 2. Try loading from cached or fresh Tiled map, fall back to programmatic chamber
+      try {
+        RenderableTiledMap? map = _tmxCache[config.tmxFile];
+        if (map == null) {
+          map = await RenderableTiledMap.fromFile(
+            config.tmxFile,
+            Vector2.all(32),
+          );
+          _tmxCache[config.tmxFile] = map;
+        }
+        final tiled = TiledComponent(map);
+        result = loadFromTiled(game, tiled);
+      } catch (_) {
+        // In headless test environments or asset bundle fallbacks
+        game.world.removeAll(game.world.children);
+        game.world.add(ChamberBackground(roomCount: config.roomCount));
+        _spawnPerimeterShell(game.world, roomCount: config.roomCount);
       }
-      final tiled = TiledComponent(map);
-      final result = loadFromTiled(game, tiled);
-      if (result != null) return result;
-    } catch (_) {
-      // In headless test environments or asset bundle fallbacks
-      game.world.removeAll(game.world.children);
-      game.world.add(ChamberBackground(roomCount: config.roomCount));
-      _spawnPerimeterShell(game.world, roomCount: config.roomCount);
+      result ??= _loadProgrammaticChamber(game, config.levelNumber);
     }
 
-    return _loadProgrammaticChamber(game, config.levelNumber);
+    if (GameState.instance.mode == 'online') {
+      _spawnOnlineCoins(game, config.levelNumber);
+    }
+
+    return result;
+  }
+
+  static void _spawnOnlineCoins(TrapDashGame game, int levelNumber) {
+    final List<Vector2> coinPositions;
+    switch (levelNumber) {
+      case 1:
+        coinPositions = [
+          Vector2(380, 516), Vector2(622, 484),
+          Vector2(1700, 516), Vector2(2150, 492),
+          Vector2(3020, 492), Vector2(3420, 492),
+        ];
+        break;
+      case 2:
+        coinPositions = [
+          Vector2(332, 488), Vector2(820, 492),
+          Vector2(1620, 516), Vector2(2120, 516),
+          Vector2(2760, 516), Vector2(3400, 516),
+        ];
+        break;
+      case 3:
+        coinPositions = [
+          Vector2(514, 516), Vector2(778, 516),
+          Vector2(1884, 516), Vector2(2240, 516),
+          Vector2(2886, 412), Vector2(3520, 308),
+        ];
+        break;
+      case 4:
+        coinPositions = [
+          Vector2(660, 384), Vector2(830, 384),
+          Vector2(1540, 516), Vector2(1740, 304),
+          Vector2(2952, 364), Vector2(3240, 364),
+        ];
+        break;
+      case 5:
+        coinPositions = [
+          Vector2(480, 516), Vector2(860, 516),
+          Vector2(1760, 516), Vector2(2032, 516),
+          Vector2(2880, 516), Vector2(3320, 516),
+        ];
+        break;
+      default:
+        coinPositions = [
+          Vector2(380, 516), Vector2(622, 484),
+          Vector2(1700, 516), Vector2(2150, 492),
+          Vector2(3020, 492), Vector2(3420, 492),
+        ];
+    }
+
+    for (final pos in coinPositions) {
+      game.world.add(PickupItem(
+        type: PickupType.coin,
+        position: pos,
+      ));
+    }
   }
 
   static void _spawnPerimeterShell(World world, {int roomCount = 1}) {
@@ -188,8 +249,9 @@ class ChamberLoader {
             final remoteMaxX = obj.properties.getValue<double>('remoteTriggerMaxX') ?? double.infinity;
             final remoteMaxY = obj.properties.getValue<double>('remoteTriggerMaxY') ?? double.infinity;
             final remoteGrounded = obj.properties.getValue<bool>('remoteRequireGrounded') ?? false;
+            final customTrapId = obj.properties.getValue<String>('trapId');
             game.world.add(TrapSpike(
-              trapId: 's_${obj.id}',
+              trapId: customTrapId ?? 's_${obj.id}',
               position: pos,
               isStatic: isStat,
               behavior: beh,
@@ -377,6 +439,7 @@ class ChamberLoader {
             ));
             break;
           case 'WarpPortal':
+            final customTrapId = obj.properties.getValue<String>('trapId');
             final targetX = obj.properties.getValue<double>('targetX') ?? pos.x;
             final targetY = obj.properties.getValue<double>('targetY') ?? pos.y;
             final invert = obj.properties.getValue<bool>('setControlsInverted');
@@ -389,10 +452,15 @@ class ChamberLoader {
             final fleeY = obj.properties.getValue<double>('fleeTargetY');
             final fleeSpd = obj.properties.getValue<double>('fleeSpeed') ?? 480.0;
             final fleeTrigX = obj.properties.getValue<double>('fleeTriggerX') ?? 1764.0;
+            final postSpikeTrapId = obj.properties.getValue<String>('postWarpSpikeTrapId') ??
+                (obj.properties.getValue('postWarpSpikeId') != null
+                    ? 's_${obj.properties.getValue('postWarpSpikeId')}'
+                    : null);
             game.world.add(WarpPortal(
-              trapId: 'wp_${obj.id}',
+              trapId: customTrapId ?? 'wp_${obj.id}',
               position: pos,
               targetPosition: Vector2(targetX, targetY),
+              postWarpSpikeTrapId: postSpikeTrapId,
               setControlsInvertedOnWarp: invert,
               secondTargetPosition: secTargetX != null && secTargetY != null ? Vector2(secTargetX, secTargetY) : null,
               secondSetControlsInvertedOnWarp: secInvert,
@@ -465,6 +533,11 @@ class ChamberLoader {
             break;
         }
       }
+    }
+
+    // Resolve post-warp spike references for WarpPortals
+    for (final portal in game.world.children.whereType<WarpPortal>()) {
+      portal.resolvePostWarpSpike();
     }
 
     if (spawn != null) {

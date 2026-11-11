@@ -4,6 +4,7 @@ import 'package:trap_dash_arena/autoload/game_state.dart';
 import 'package:trap_dash_arena/game/level_config.dart';
 
 class LevelController {
+  static const int totalOnlineCoins = 6;
   late LevelConfig config;
 
   final ValueNotifier<double> timeLeft = ValueNotifier<double>(90.0);
@@ -11,6 +12,7 @@ class LevelController {
   final ValueNotifier<int> hearts = ValueNotifier<int>(5);
   final ValueNotifier<int> score = ValueNotifier<int>(0);
   final ValueNotifier<int> keysCollected = ValueNotifier<int>(0);
+  final ValueNotifier<int> coinsCollected = ValueNotifier<int>(0);
   final ValueNotifier<double> progress = ValueNotifier<double>(0.0);
   final ValueNotifier<double> suddenDeathLeft = ValueNotifier<double>(0.0);
   final ValueNotifier<bool> isGameOver = ValueNotifier<bool>(false);
@@ -23,6 +25,8 @@ class LevelController {
   int _baseScore = 0;
   int _exitBonus = 0;
 
+  int get timeBonus => _exitBonus;
+
   void startLevel(LevelConfig newConfig) {
     config = newConfig;
     timeLeft.value = config.timeLimit;
@@ -30,6 +34,7 @@ class LevelController {
     hearts.value = config.initialHearts;
     score.value = 0;
     keysCollected.value = 0;
+    coinsCollected.value = 0;
     progress.value = 0.0;
     currentPlatform.value = 1;
     suddenDeathLeft.value = 0.0;
@@ -70,15 +75,22 @@ class LevelController {
     if (isGameOver.value) return;
 
     if (_visitedCheckpoints.add(checkpointId)) {
-      _baseScore += 100;
-      _updateTotalScore();
+      if (GameState.instance.mode != 'online') {
+        _baseScore += 100;
+        _updateTotalScore();
+      }
     }
   }
 
   void collectCoin() {
     if (isGameOver.value) return;
 
-    _baseScore += 50;
+    coinsCollected.value++;
+    if (GameState.instance.mode == 'online') {
+      _baseScore += 100;
+    } else {
+      _baseScore += 50;
+    }
     _updateTotalScore();
   }
 
@@ -94,8 +106,10 @@ class LevelController {
     if (isGameOver.value) return;
 
     if (_baitedTraps.add(trapId)) {
-      _baseScore += 25;
-      _updateTotalScore();
+      if (GameState.instance.mode != 'online') {
+        _baseScore += 25;
+        _updateTotalScore();
+      }
     }
   }
 
@@ -105,7 +119,9 @@ class LevelController {
     if (!GameState.instance.isDevMode) {
       hearts.value = max(0, hearts.value - 1);
     }
-    _baseScore = max(0, _baseScore - 25);
+    if (GameState.instance.mode != 'online') {
+      _baseScore = max(0, _baseScore - 25);
+    }
     _updateTotalScore();
 
     if (hearts.value <= 0 && !GameState.instance.isDevMode) {
@@ -120,7 +136,11 @@ class LevelController {
       return;
     }
 
-    _exitBonus = 300 + (timeLeft.value.ceil() * 10);
+    if (GameState.instance.mode == 'online') {
+      _exitBonus = timeLeft.value.ceil() * 10;
+    } else {
+      _exitBonus = 300 + (timeLeft.value.ceil() * 10);
+    }
     _updateTotalScore();
     endLevel(true);
   }
@@ -152,11 +172,18 @@ class LevelController {
     isGameOver.value = true;
     isLevelCleared.value = won;
 
+    if (GameState.instance.mode == 'online' && !won) {
+      _exitBonus = 0;
+      _updateTotalScore();
+    }
+
     final stars = calculateStars();
     GameState.instance.lastResult = {
       'level': config.levelNumber,
       'won': won,
       'score': score.value,
+      'coins': coinsCollected.value,
+      'timeBonus': _exitBonus,
       'timeLeft': timeLeft.value,
       'heartsLeft': hearts.value,
       'stars': stars,
@@ -177,6 +204,7 @@ class LevelController {
     hearts.dispose();
     score.dispose();
     keysCollected.dispose();
+    coinsCollected.dispose();
     progress.dispose();
     suddenDeathLeft.dispose();
     isGameOver.dispose();

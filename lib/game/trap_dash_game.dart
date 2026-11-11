@@ -13,19 +13,20 @@ import 'package:trap_dash_arena/autoload/palette.dart';
 import 'package:trap_dash_arena/game/actors/arsenal_cannon.dart';
 import 'package:trap_dash_arena/game/actors/control_inverter_zone.dart';
 import 'package:trap_dash_arena/game/actors/disappearing_platform.dart';
+import 'package:trap_dash_arena/game/actors/exit_portal.dart';
 import 'package:trap_dash_arena/game/actors/fake_floor.dart';
 import 'package:trap_dash_arena/game/actors/falling_block.dart';
 import 'package:trap_dash_arena/game/actors/moving_gap_floor.dart';
 import 'package:trap_dash_arena/game/actors/moving_saw.dart';
 import 'package:trap_dash_arena/game/actors/player.dart';
 import 'package:trap_dash_arena/game/actors/portal_gauntlet_controller.dart';
+import 'package:trap_dash_arena/game/actors/rival_ghost.dart';
 import 'package:trap_dash_arena/game/actors/sudden_gap.dart';
 import 'package:trap_dash_arena/game/actors/trap_spike.dart';
 import 'package:trap_dash_arena/game/actors/warp_portal.dart';
 import 'package:trap_dash_arena/game/chamber_loader.dart';
 import 'package:trap_dash_arena/game/level_config.dart';
 import 'package:trap_dash_arena/game/level_controller.dart';
-import 'package:trap_dash_arena/game/simple_ai.dart';
 
 class TrapDashGame extends FlameGame
     with HasCollisionDetection, KeyboardEvents {
@@ -36,7 +37,6 @@ class TrapDashGame extends FlameGame
   final AudioManager audio = AudioManager.instance;
 
   late Player player;
-  SimpleAI? paceBot;
   Vector2 startSpawnPosition = Vector2(148, 552);
   Vector2 lastCheckpointPosition = Vector2(148, 552);
 
@@ -145,16 +145,9 @@ class TrapDashGame extends FlameGame
     player = Player(position: startSpawnPosition);
     world.add(player);
 
-    // Spawn offline Pace-Bot rival if enabled
-    if (GameState.instance.aiBotEnabled) {
-      paceBot = SimpleAI(
-        levelNumber: levelNumber,
-        startPosition: startSpawnPosition,
-        defaultExitX: _exitX,
-      );
-      world.add(paceBot!);
-    } else {
-      paceBot = null;
+    // Spawn rival ghost in online 1v1 match
+    if (GameState.instance.mode == 'online') {
+      world.add(RivalGhost(position: startSpawnPosition.clone()));
     }
 
     await ready();
@@ -220,6 +213,8 @@ class TrapDashGame extends FlameGame
         child.resetToInitial();
       } else if (child is ArsenalBall) {
         child.removeFromParent();
+      } else if (child is ExitPortal) {
+        child.resetToInitial();
       }
     }
 
@@ -240,16 +235,23 @@ class TrapDashGame extends FlameGame
   }
 
   void pauseGame() {
-    pauseEngine();
+    if (GameState.instance.mode != 'online') {
+      pauseEngine();
+    } else {
+      player.stopMoving();
+    }
     overlays.add('PauseOverlay');
   }
 
   void resumeGame() {
     overlays.remove('PauseOverlay');
-    resumeEngine();
+    if (GameState.instance.mode != 'online') {
+      resumeEngine();
+    }
   }
 
   Future<void> restartLevel() async {
+    if (GameState.instance.mode == 'online') return;
     if (overlays.isActive('PauseOverlay')) overlays.remove('PauseOverlay');
     if (overlays.isActive('ResultOverlay')) overlays.remove('ResultOverlay');
     if (overlays.isActive('RespawnOverlay')) overlays.remove('RespawnOverlay');
@@ -277,18 +279,28 @@ class TrapDashGame extends FlameGame
       controller.currentPlatform.value = activePlatformIndex;
     }
 
-    // Report network multiplayer score and progress
+    // Auto-end match on opponent forfeit
+    if (GameState.instance.mode == 'online' &&
+        NetManager.instance.opponentDisconnected.value &&
+        !controller.isGameOver.value) {
+      controller.endLevel(true);
+    }
+
+    // Report network multiplayer score, coins, progress, and position (0.5s cadence)
     if (GameState.instance.mode == 'online' && NetManager.instance.isConnected.value) {
       _netUpdateTimer += dt;
       final scoreChanged = controller.score.value != _lastReportedScore;
       final progressChanged = (progressVal - _lastReportedProgress).abs() >= 0.01;
-      if (scoreChanged || (_netUpdateTimer >= 0.25 && progressChanged)) {
+      if (scoreChanged || progressChanged || _netUpdateTimer >= 0.50) {
         _lastReportedScore = controller.score.value;
         _lastReportedProgress = progressVal;
         _netUpdateTimer = 0.0;
         NetManager.instance.sendScore(
           score: controller.score.value,
+          coins: controller.coinsCollected.value,
           progress: progressVal,
+          x: player.position.x,
+          y: player.position.y,
         );
       }
 
@@ -296,6 +308,9 @@ class TrapDashGame extends FlameGame
         _reportedFinished = true;
         NetManager.instance.reportFinished(
           score: controller.score.value,
+          coins: controller.coinsCollected.value,
+          timeBonus: controller.timeBonus,
+          timeLeft: controller.timeLeft.value,
           won: controller.isLevelCleared.value,
         );
       }

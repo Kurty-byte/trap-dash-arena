@@ -69,5 +69,53 @@ void main() {
       expect(player.isEnteringDoor, isFalse);
       expect(game.controller.isLevelCleared.value, isTrue);
     });
+
+    test('ExitPortal collision while player isInDeathCycle does not start entering', () async {
+      final portal = ExitPortal(position: Vector2(500, 552));
+      await game.world.add(portal);
+      await game.ready();
+
+      player.position = Vector2(495, 552);
+      player.takeDamage(ignoreInvulnerability: true);
+      expect(player.isInDeathCycle, isTrue);
+
+      // Collision while in death cycle
+      portal.onCollisionStart({Vector2(500, 552)}, player);
+
+      expect(portal.isEntering, isFalse);
+      expect(player.isEnteringDoor, isFalse);
+      expect(game.controller.isLevelCleared.value, isFalse);
+    });
+
+    test('respawnPlayerAtCheckpoint resets ExitPortal so level can be cleared after death', () async {
+      final portal = ExitPortal(position: Vector2(500, 552));
+      await game.world.add(portal);
+      await game.ready();
+
+      // Simulate player dying near the door
+      player.position = Vector2(495, 552);
+      player.takeDamage(ignoreInvulnerability: true);
+
+      // Even if portal somehow started entering or was in progress
+      portal.onCollisionStart({Vector2(500, 552)}, player);
+
+      // Trigger respawn at checkpoint
+      game.respawnPlayerAtCheckpoint(playReintegration: false);
+
+      expect(portal.isEntering, isFalse);
+      expect(player.isEnteringDoor, isFalse);
+      expect(player.isInDeathCycle, isFalse);
+
+      // Player returns to door alive and enters successfully
+      player.position = Vector2(495, 552);
+      portal.onCollisionStart({Vector2(500, 552)}, player);
+
+      expect(portal.isEntering, isTrue);
+      expect(player.isEnteringDoor, isTrue);
+
+      player.update(0.5);
+      expect(player.isEnteringDoor, isFalse);
+      expect(game.controller.isLevelCleared.value, isTrue);
+    });
   });
 }
