@@ -8,7 +8,7 @@
 ---
 
 ## 1. Pitch
-*Trap Dash Arena* is a deceptive 2D precision action-platformer inspired by *Level Devil* and *Trap Adventure 2* where players navigate five increasingly treacherous trap-filled dungeons—either solo offline (with an optional AI pace-bot rival) or in a frantic 2–5 player local Wi-Fi score-rush—to reach the exit portal before time or lives run out.
+*Trap Dash Arena* is a deceptive 2D precision action-platformer inspired by *Level Devil* and *Trap Adventure 2* where players navigate five increasingly treacherous trap-filled dungeons—either solo offline (with an optional AI pace-bot rival) or in a frantic 1v1 local Wi-Fi score-rush—to reach the exit portal before time or lives run out.
 
 ## 2. Genre and Target Players
 * **Genre:** 2D Deceptive Trap Platformer / Competitive Score-Rush Arcade.
@@ -25,7 +25,7 @@
 * **Win Condition:** Enter the `ExitPortal` doorway while $t_{\text{left}} > 0$ and $\text{Hearts} \ge 1$ (and any required keys collected). Triggers `ResultOverlay` (`ResultScreen`), awards 1–3 stars, unlocks level $n+1$ in Offline Mode, and persists progress via `SharedPreferences`.
 * **Death & Respawn ("Fair Rage" Loop):** Hitting a trap or falling into a pit triggers a shard disintegration burst, deducts $1$ Heart (`-25 pts`), and displays `RespawnOverlay` (`"YOU DIED"`). Tapping `RESPAWN` resets chamber traps and reintegrates the player at the last activated `CheckpointFlag`.
 * **Lose Condition (Offline):** Either $\text{Hearts} = 0$ or $t_{\text{left}} \le 0.0\text{s}$. Triggers `ResultOverlay` (`"TRY AGAIN"`) with `RETRY` and `MENU` (`NEXT` is hidden).
-* **Win/Lose Condition (Online 2–5 Players):** All connected players compete on the chosen stage simultaneously. When all active players finish or are eliminated, the Host adjudicates the winner with the highest deterministic score and broadcasts the final leaderboard (`announce_winner`).
+* **Win/Lose Condition (Online 1v1):** All connected players compete on the chosen stage simultaneously. When all active players finish or are eliminated, the Host adjudicates the winner with the highest deterministic score and broadcasts the final leaderboard (`announce_winner`).
 
 ## 5. Level Plan (Difficulty Curve)
 
@@ -48,7 +48,7 @@
 * **Solo Campaign:** 100% playable in Airplane Mode with zero network calls.
 * **Race vs. AI Bot (`SimpleAI`):** Optional toggle in `SettingsScreen` that spawns a visible translucent ghost runner (`BOT` tag) and increments its simulated score (`+35 pts` per step) at level-scaled intervals ($\text{delay} = \max(0.8, 3.0 - 0.4 \times (\text{level} - 1))$).
 
-## 8. Online Mode (2–5 Player Score-Rush)
-* **Match Type:** Real-time competitive score-rush across 2–5 devices over local Wi-Fi/Hotspot (`HttpServer` + `WebSocket` on port `7777`, 5s connection timeout).
+## 8. Online Mode (1v1 Score-Rush)
+* **Match Type:** Real-time competitive score-rush across 2 devices over local Wi-Fi/Hotspot (`HttpServer` + `WebSocket` on port `7777`, 5s connection timeout).
 * **Score Formula:** $\text{Score} = \max(0, 100C + 50K + 25B - 25D) + E_{\text{bonus}}$, where $E_{\text{bonus}} = 300 + (\lceil t_{\text{left}} \rceil \times 10)$.
 * **Payloads:** JSON event packets (`join_lobby`, `lobby_state`, `start_match`, `score_event`, `player_finished`, `announce_winner`, `peer_disconnected`).

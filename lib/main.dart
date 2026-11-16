@@ -7,7 +7,7 @@ import 'package:trap_dash_arena/ui/title_screen.dart';
 import 'package:trap_dash_arena/ui/widgets/arcade_page_route.dart';
 
 /// Development trigger: when true, lives are infinite and all levels are unlocked.
-const bool kDevMode = true;
+const bool kDevMode = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -3,6 +3,7 @@ import 'package:trap_dash_arena/autoload/audio_manager.dart';
 import 'package:trap_dash_arena/autoload/game_state.dart';
 import 'package:trap_dash_arena/autoload/net_manager.dart';
 import 'package:trap_dash_arena/autoload/palette.dart';
+import 'package:trap_dash_arena/game/level_controller.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
 import 'package:trap_dash_arena/ui/main_menu_screen.dart';
 import 'package:trap_dash_arena/ui/widgets/arcade_confetti.dart';
@@ -339,7 +340,7 @@ class ResultOverlay extends StatelessWidget {
                                           ),
                                           const SizedBox(height: 5),
                                           Text(
-                                            '🪙 Coins: $coins/6 (+$coinPts PTS) | ⏱️ Time: ${wonStage ? "+$timeBonus PTS" : (forfeit ? "FORFEIT" : "0 PTS (ELIMINATED)")}',
+                                            '🪙 Coins: $coins/${LevelController.totalOnlineCoins} (+$coinPts PTS) | ⏱️ Time: ${wonStage ? "+$timeBonus PTS" : (forfeit ? "FORFEIT" : "0 PTS (ELIMINATED)")}',
                                             style: const TextStyle(
                                               fontFamily: 'AtkinsonHyperlegible',
                                               fontSize: 13,
@@ -354,7 +355,7 @@ class ResultOverlay extends StatelessWidget {
                                 else ...[
                                   _buildStatRow('YOUR SCORE', '$score PTS'),
                                   const SizedBox(height: 6),
-                                  _buildStatRow('COINS', '${controller.coinsCollected.value}/6'),
+                                  _buildStatRow('COINS', '${controller.coinsCollected.value}/${LevelController.totalOnlineCoins}'),
                                   const SizedBox(height: 6),
                                   const Text(
                                     'Waiting for rival to finish...',

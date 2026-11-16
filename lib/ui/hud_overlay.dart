@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:trap_dash_arena/autoload/game_state.dart';
 import 'package:trap_dash_arena/autoload/net_manager.dart';
 import 'package:trap_dash_arena/autoload/palette.dart';
+import 'package:trap_dash_arena/game/level_controller.dart';
 import 'package:trap_dash_arena/game/trap_dash_game.dart';
 import 'package:trap_dash_arena/ui/widgets/hud_sprite.dart';
 
@@ -80,69 +81,61 @@ class HudOverlay extends StatelessWidget {
                         ],
                         const SizedBox(width: 4),
 
-                        // Hearts Row with high-contrast shadow (tap to toggle Dev Infinite Lives)
-                        GestureDetector(
-                          key: const Key('hud_dev_hearts_toggle'),
-                          onTap: () {
-                            if (_canInteract(game)) {
-                              GameState.instance.toggleDevMode();
-                            }
-                          },
-                          child: ValueListenableBuilder<bool>(
-                            valueListenable: GameState.instance.devMode,
-                            builder: (context, isDev, _) {
-                              return ValueListenableBuilder<int>(
-                                valueListenable: controller.hearts,
-                                builder: (context, heartsVal, _) {
-                                  return Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      ...List.generate(
-                                        controller.config.initialHearts,
-                                        (index) => Padding(
-                                          padding: const EdgeInsets.only(right: 3),
-                                          child: Icon(
-                                            Icons.favorite_rounded,
-                                            color: (isDev || index < heartsVal)
-                                                ? AppPalette.yellowBackground
-                                                : AppPalette.playerBlack.withValues(alpha: 0.35),
-                                            size: 19,
-                                            shadows: const [
-                                              Shadow(
-                                                color: AppPalette.playerBlack,
-                                                blurRadius: 2.0,
-                                                offset: Offset(1, 1),
-                                              ),
-                                            ],
+                        // Hearts Row with high-contrast shadow
+                        ValueListenableBuilder<bool>(
+                          valueListenable: GameState.instance.devMode,
+                          builder: (context, isDev, _) {
+                            return ValueListenableBuilder<int>(
+                              valueListenable: controller.hearts,
+                              builder: (context, heartsVal, _) {
+                                return Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ...List.generate(
+                                      controller.config.initialHearts,
+                                      (index) => Padding(
+                                        padding: const EdgeInsets.only(right: 3),
+                                        child: Icon(
+                                          Icons.favorite_rounded,
+                                          color: (isDev || index < heartsVal)
+                                              ? AppPalette.yellowBackground
+                                              : AppPalette.playerBlack.withValues(alpha: 0.35),
+                                          size: 19,
+                                          shadows: const [
+                                            Shadow(
+                                              color: AppPalette.playerBlack,
+                                              blurRadius: 2.0,
+                                              offset: Offset(1, 1),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    if (isDev)
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 2),
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppPalette.playerBlack,
+                                          border: Border.all(
+                                            color: AppPalette.yellowBackground,
+                                            width: 1.0,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'DEV ∞',
+                                          style: TextStyle(
+                                            fontFamily: 'PressStart2P',
+                                            fontSize: 8,
+                                            color: AppPalette.yellowBackground,
                                           ),
                                         ),
                                       ),
-                                      if (isDev)
-                                        Container(
-                                          margin: const EdgeInsets.only(left: 2),
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: AppPalette.playerBlack,
-                                            border: Border.all(
-                                              color: AppPalette.yellowBackground,
-                                              width: 1.0,
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'DEV ∞',
-                                            style: TextStyle(
-                                              fontFamily: 'PressStart2P',
-                                              fontSize: 8,
-                                              color: AppPalette.yellowBackground,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  );
-                                },
-                              );
-                            },
-                          ),
+                                  ],
+                                );
+                              },
+                            );
+                          },
                         ),
 
                         // Keys count badge if keys required
@@ -324,7 +317,7 @@ class HudOverlay extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 3),
                                   Text(
-                                    '$coinsVal/6',
+                                    '$coinsVal/${LevelController.totalOnlineCoins}',
                                     style: const TextStyle(
                                       fontFamily: 'PressStart2P',
                                       fontSize: 11,
@@ -373,7 +366,7 @@ class HudOverlay extends StatelessWidget {
                         if (players.isEmpty) return const SizedBox.shrink();
 
                         return Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -392,7 +385,7 @@ class HudOverlay extends StatelessWidget {
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 5),
                                     child: Text(
-                                      '${isMe ? "YOU" : "RIVAL"} ($name): $sc PTS 🪙$c/6',
+                                      '${isMe ? "YOU" : "RIVAL"} ($name): $sc PTS 🪙$c/${LevelController.totalOnlineCoins}',
                                       style: TextStyle(
                                         fontFamily: 'PressStart2P',
                                         fontSize: 9,

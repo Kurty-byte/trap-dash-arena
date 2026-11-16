@@ -1,6 +1,31 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trap_dash_arena/autoload/match_transport.dart';
 import 'package:trap_dash_arena/autoload/net_manager.dart';
+
+/// Host-side fake that records everything NetManager sends.
+class _RecordingTransport implements MatchTransport {
+  final sent = <Map<String, dynamic>>[];
+
+  @override
+  Stream<Map<String, dynamic>> get incomingEvents => const Stream.empty();
+  @override
+  bool get isHost => true;
+  @override
+  bool get isConnected => true;
+  @override
+  Future<void> hostSession({required int port, required int maxClients}) async {}
+  @override
+  Future<void> joinSession(
+      {required String host,
+      required int port,
+      Duration timeout = const Duration(seconds: 5)}) async {}
+  @override
+  void sendEvent(Map<String, dynamic> event) => sent.add(event);
+  @override
+  Future<void> disconnect() async {}
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -175,6 +200,78 @@ void main() {
       expect(hostNet.finalScoreboard.value?.length, equals(2));
 
       await hostNet.disconnect();
+    });
+
+    test('return_to_lobby from peer resets state without echoing back', () async {
+      final fake = _RecordingTransport();
+      hostNet.setTransportForTesting(fake);
+      await hostNet.startHost(nickname: 'H', port: 7793);
+      hostNet.isMatchStarted.value = true;
+
+      hostNet.handleIncomingEventForTesting({'type': 'return_to_lobby'});
+
+      expect(hostNet.isMatchStarted.value, isFalse);
+      expect(fake.sent.where((e) => e['type'] == 'return_to_lobby'), isEmpty);
+
+      // Local tap still notifies the peer exactly once.
+      hostNet.returnToLobby();
+      expect(fake.sent.where((e) => e['type'] == 'return_to_lobby').length, 1);
+    });
+
+    test('guest id comes from transport (not hardcoded 2) and scores are not echoed', () async {
+      final fake = _RecordingTransport();
+      hostNet.setTransportForTesting(fake);
+      await hostNet.startHost(nickname: 'H', port: 7794);
+
+      hostNet.handleIncomingEventForTesting(
+          {'type': 'join_lobby', 'playerId': '3', 'nickname': 'G'});
+      expect(hostNet.players.value['3'], equals('G'));
+      expect(fake.sent.last['assignedId'], equals('3'));
+
+      fake.sent.clear();
+      hostNet.handleIncomingEventForTesting(
+          {'type': 'score_event', 'playerId': '3', 'score': 100});
+      expect(hostNet.playerScores.value['3'], equals(100));
+      expect(fake.sent, isEmpty);
+      expect(hostNet.playerPositions.value, isEmpty);
+    });
+
+    test('second guest is refused with a clear message when lobby is full', () async {
+      hostNet.setTransportForTesting(LocalWsTransport());
+      await hostNet.startHost(nickname: 'H', port: 7795);
+      final first = LocalWsTransport();
+      await first.joinSession(host: '127.0.0.1', port: 7795);
+
+      final second = LocalWsTransport();
+      await expectLater(
+        second.joinSession(host: '127.0.0.1', port: 7795),
+        throwsA(isA<SocketException>().having((e) => e.message, 'message',
+            contains('lobby may be full'))),
+      );
+      await first.disconnect();
+    });
+
+    test('discoverHosts lists a host beacon and ignores junk', () async {
+      final scan = NetManager.discoverHosts(
+        timeout: const Duration(milliseconds: 600),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      final sender = await RawDatagramSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final to = InternetAddress.loopbackIPv4;
+      sender.send(utf8.encode('not json'), to, NetManager.discoveryPort);
+      sender.send(
+        utf8.encode(jsonEncode({'g': 'TDA', 'n': 'Ace', 'l': 3, 'p': 7777})),
+        to,
+        NetManager.discoveryPort,
+      );
+
+      final hosts = await scan;
+      sender.close();
+
+      expect(hosts.length, equals(1));
+      expect(hosts.first.name, equals('Ace'));
+      expect(hosts.first.level, equals(3));
+      expect(hosts.first.ip, equals('127.0.0.1'));
     });
 
     test('1v1 Mid-match forfeit grants win to remaining player', () async {

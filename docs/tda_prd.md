@@ -85,7 +85,7 @@ Levels $1\text{--}4$ are 3-room enclosed dungeon chambers ($3 \times 1280\text{ 
 ### 1.11 Risks and Mitigations
 * **Risk 1 (Playtest Frustration):** Unforgiving traps could cause playtesters to take $>4$ formal attempts on early levels.
   * *Mitigation:* Give players $3\text{--}5$ Hearts and $2$ mid-level checkpoints per attempt (`RespawnOverlay`), plus visual/audio tells and a High-Contrast Trap Tells accessibility toggle.
-* **Risk 2 (Multiplayer Desync with 2–5 Players):** Syncing $5$ physics bodies at $60\text{ FPS}$ over mobile hotspot can lag.
+* **Risk 2 (Multiplayer Desync with 2 Players):** Syncing $5$ physics bodies at $60\text{ FPS}$ over mobile hotspot can lag.
   * *Mitigation:* Sync discrete score events (`score_event`), normalized horizontal progress ($0.0\text{--}1.0$), and finish notifications (`player_finished`) rather than frame-by-frame physics bodies.
 
 ---
@@ -102,7 +102,7 @@ This matrix maps every mandatory requirement (`R1`–`R10`), bonus item, and rub
 | **R4** | Level unlocking: level $n+1$ stays locked until level $n$ is cleared. | `GameState.isUnlocked(level)` checks `level <= unlockedLevel`. In `LevelSelectScreen`, levels $> \text{unlockedLevel}$ render a padlock icon and disable tap navigation (`onTap: null`). | Open `LevelSelectScreen` with `kDevMode = false`: Level $1$ is open, Levels $2\text{--}5$ show lock icons and cannot be started. |
 | **R5** | Progress is saved on the device and survives closing the app. | `GameState.completeLevel()` persists `unlocked_level` and JSON-encoded `best_stars` immediately to device flash storage via Flutter's `SharedPreferences`. | Clear Level $1$, force-close the app from Android Recents, reopen: Level $2$ remains unlocked with saved stars. |
 | **R6** | Offline mode playable in airplane mode (solo, versus computer, or two players on one device). | Selecting `PLAY OFFLINE` sets `GameState.mode = 'offline'` and loads local assets and `SharedPreferences` with zero network dependencies. Includes both Solo Campaign and optional `SimpleAI` Pace-Bot ghost runner mode. | Enable Airplane Mode on the phone, play Offline Mode, clear a level, verify saving and zero network errors. |
-| **R7** | Online mode where two players on two devices play the same match in real time or turn by turn. | Supports **$2\text{ to }5$ players** in a real-time score-based match via `NetManager` and `LocalWsTransport` (`HttpServer` + `WebSocket` on port `7777`, `maxClients = 4`). Host broadcasts level and seed; clients stream live `score_event` updates; Host adjudicates the winner (`announce_winner`). | Connect $2\text{--}5$ phones on the same Wi-Fi/hotspot, run a full match, and verify live HUD leaderboard updates and unified winner screen. |
+| **R7** | Online mode where two players on two devices play the same match in real time or turn by turn. | Supports **$2\text{ to }5$ players** in a real-time score-based match via `NetManager` and `LocalWsTransport` (`HttpServer` + `WebSocket` on port `7777`, `maxClients = 1`). Host broadcasts level and seed; clients stream live `score_event` updates; Host adjudicates the winner (`announce_winner`). | Connect $2\text{--}5$ phones on the same Wi-Fi/hotspot, run a full match, and verify live HUD leaderboard updates and unified winner screen. |
 | **R8** | Mode selection on the main menu (Offline/Online) and a clear message when the online server cannot be reached. | `ModeSelectScreen` presents `PLAY OFFLINE` and `PLAY ONLINE` buttons. `NetManager.joinGame()` enforces a $5\text{-second}$ connection timeout and `try/catch` socket handler; if Wi-Fi is off or host IP is unreachable, `LobbyScreen` displays an `ArcadeDialog` with `"Cannot reach host. Check that you are on the same Wi-Fi."` and stays responsive. | Turn off Wi-Fi, tap `PLAY ONLINE` $\rightarrow$ `JOIN`: game displays the exact error modal with zero crash or freeze. |
 | **R9** | Runs on a real phone (Android APK or iOS build), in one fixed orientation, with touch controls. | Built as a native Android APK, locked to `DeviceOrientation.landscapeLeft` / `landscapeRight` ($1280\times720$), with multi-touch `Listener` wireframe pads in `TouchControlsOverlay` for Left ($148\times124$), Right ($148\times124$), and Jump ($156\times128$). | Installed and verified on physical Android phones. |
 | **R10** | Basic polish: title screen, pause menu, sound on/off option, readable text on small screens. | Full screen flow implemented; in-level `PauseOverlay` pauses the Flame engine (`game.pauseEngine()`); global audio mute saved in `SharedPreferences` via `AudioManager`; accessible typography; Android system back gesture handled via `PopScope`; `CREDITS.md` and `CreditsScreen` included. | Verified across UI flow tests (`screens_flow_test.dart`, `enclosed_overlays_test.dart`). |
@@ -178,7 +178,7 @@ trap_dash_arena/
 │   │   ├── audio_manager.dart              # Singleton: BGM lifecycle, AudioPool SFX, mute persistence
 │   │   ├── game_state.dart                 # Singleton: save/load progress, stars, unlocked_level, settings
 │   │   ├── match_transport.dart            # Transport abstraction for WebSocket multiplayer
-│   │   ├── net_manager.dart                # Singleton: 2-5 player WebSocket Host/Join (port 7777)
+│   │   ├── net_manager.dart                # Singleton: 1v1 WebSocket Host/Join (port 7777)
 │   │   └── palette.dart                    # AppPalette color constants
 │   ├── game/
 │   │   ├── trap_dash_game.dart             # FlameGame root class (camera, collision, level loader)
@@ -220,7 +220,7 @@ class GameState {
 ```
 
 ### 4.3 $2\text{--}5$ Player Networking Architecture (`lib/autoload/net_manager.dart`)
-* **Port & Capacity:** Uses `defaultPort = 7777` and `maxClients = 4` ($1\text{ Host} + \text{up to } 4\text{ Guests} = 5\text{ Players}$).
+* **Port & Capacity:** Uses `defaultPort = 7777` and `maxClients = 1` (1 Host + 1 Guest).
 * **Lobby & Match Flow (`LobbyScreen` & `NetManager`):**
   1. Host taps **HOST GAME**: binds `HttpServer.bind(InternetAddress.anyIPv4, 7777)` upgraded via `WebSocketTransformer`. Displays the Host's local IPv4 address (with one-tap clipboard copy) and a live list of connected players ($1/5 \dots 5/5$).
   2. Guests enter the Host IP and tap **JOIN GAME**.

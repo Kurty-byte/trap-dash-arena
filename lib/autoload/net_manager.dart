@@ -53,6 +53,8 @@ class LocalWsTransport implements MatchTransport {
         }
 
         WebSocketTransformer.upgrade(request).then((socket) {
+          // Ping so half-open Wi-Fi drops close the socket (-> forfeit path).
+          socket.pingInterval = const Duration(seconds: 2);
           final clientId = '${_nextClientId++}';
           _clientSockets[clientId] = socket;
 
@@ -85,7 +87,7 @@ class LocalWsTransport implements MatchTransport {
               });
             },
           );
-        });
+        }).catchError((_) {});
       },
       onError: (_) {
         disconnect();
@@ -107,6 +109,7 @@ class LocalWsTransport implements MatchTransport {
         'ws://$host:$port',
       ).timeout(timeout);
 
+      socket.pingInterval = const Duration(seconds: 2);
       _guestSocket = socket;
       _isConnected = true;
 
@@ -135,10 +138,13 @@ class LocalWsTransport implements MatchTransport {
       throw const SocketException(
         'Cannot reach host. Check that you are on the same Wi-Fi.',
       );
-    } catch (_) {
+    } catch (e) {
       await disconnect();
-      throw const SocketException(
-        'Cannot reach host. Check that you are on the same Wi-Fi.',
+      // Reached a server that refused the upgrade: our host answers 503 when full.
+      throw SocketException(
+        e is WebSocketException
+            ? 'Host refused the connection. The lobby may be full.'
+            : 'Cannot reach host. Check that you are on the same Wi-Fi.',
       );
     }
   }
@@ -183,12 +189,87 @@ class LocalWsTransport implements MatchTransport {
   }
 }
 
+/// A host heard on the LAN via its UDP beacon.
+class DiscoveredHost {
+  final String ip;
+  final String name;
+  final int level;
+  final int port;
+  const DiscoveredHost(this.ip, this.name, this.level, this.port);
+}
+
 /// Singleton manager for 1v1 (2-player) real-time local multiplayer ghost race.
 class NetManager {
   static final NetManager instance = NetManager._();
   NetManager._();
 
   static const int defaultPort = 7777;
+  static const int discoveryPort = 7778;
+
+  Timer? _beacon;
+  RawDatagramSocket? _beaconSocket;
+
+  /// Host: broadcast a tiny UDP beacon every second while the lobby has room.
+  Future<void> _startBeacon(int port) async {
+    try {
+      final socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+      socket.broadcastEnabled = true;
+      _beaconSocket = socket;
+      _beacon = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (players.value.length >= 2) return; // full: stop advertising
+        socket.send(
+          utf8.encode(jsonEncode({
+            'g': 'TDA',
+            'n': localNickname,
+            'l': selectedLevel,
+            'p': port,
+          })),
+          InternetAddress('255.255.255.255'),
+          discoveryPort,
+        );
+      });
+    } catch (_) {
+      // Discovery is optional; manual IP entry still works.
+    }
+  }
+
+  /// Guest: listen for host beacons for [timeout] and return who answered.
+  /// shortcut: UDP broadcast only, so it misses hosts on networks that block broadcast; manual IP is the fallback.
+  static Future<List<DiscoveredHost>> discoverHosts({
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
+    final found = <String, DiscoveredHost>{};
+    RawDatagramSocket? socket;
+    try {
+      final s = socket = await RawDatagramSocket.bind(
+        InternetAddress.anyIPv4,
+        discoveryPort,
+        reuseAddress: true,
+      );
+      final sub = s.listen((event) {
+        if (event != RawSocketEvent.read) return;
+        final d = s.receive();
+        if (d == null) return;
+        try {
+          final m = jsonDecode(utf8.decode(d.data)) as Map<String, dynamic>;
+          if (m['g'] != 'TDA') return;
+          found[d.address.address] = DiscoveredHost(
+            d.address.address,
+            (m['n'] as String?) ?? 'Host',
+            (m['l'] as int?) ?? 1,
+            (m['p'] as int?) ?? defaultPort,
+          );
+        } catch (_) {}
+      });
+      await Future<void>.delayed(timeout);
+      await sub.cancel();
+    } catch (_) {
+      // Bind failed: report whatever we have (nothing).
+    } finally {
+      socket?.close();
+    }
+    return found.values.toList();
+  }
   static const int maxClients = 1; // Strict 1v1: 1 Host + 1 Guest = 2 players max
   static const String errorWifiMessage =
       'Cannot reach host. Check that you are on the same Wi-Fi.';
@@ -217,6 +298,8 @@ class NetManager {
   final ValueNotifier<List<Map<String, dynamic>>?> finalScoreboard =
       ValueNotifier<List<Map<String, dynamic>>?>(null);
   final ValueNotifier<bool> opponentDisconnected = ValueNotifier<bool>(false);
+
+  String _guestId = '2'; // id the transport stamped on the guest (host side)
 
   final Set<String> _finishedPlayers = {};
   final Map<String, Map<String, dynamic>> _finishDetails = {};
@@ -271,7 +354,7 @@ class NetManager {
     playerScores.value = {'1': 0};
     playerCoins.value = {'1': 0};
     playerProgress.value = {'1': 0.0};
-    playerPositions.value = {'1': Offset.zero};
+    playerPositions.value = {}; // empty until a real position arrives (no ghost snap to 0,0)
     isMatchStarted.value = false;
     matchWinnerId.value = null;
     finalScoreboard.value = null;
@@ -280,6 +363,7 @@ class NetManager {
     await _transport.hostSession(port: port, maxClients: maxClients);
     isConnected.value = true;
     _listenToEvents();
+    await _startBeacon(port);
   }
 
   /// Join an existing host session.
@@ -355,7 +439,8 @@ class NetManager {
         break;
 
       case 'join_lobby':
-        const clientId = '2';
+        final clientId = event['playerId'] as String? ?? '2';
+        _guestId = clientId;
         final clientNick = (event['nickname'] as String?) ?? 'Guest';
         final updated = Map<String, String>.from(players.value);
         updated[clientId] = clientNick;
@@ -372,10 +457,6 @@ class NetManager {
         final updatedProg = Map<String, double>.from(playerProgress.value);
         updatedProg[clientId] = 0.0;
         playerProgress.value = updatedProg;
-
-        final updatedPos = Map<String, Offset>.from(playerPositions.value);
-        updatedPos[clientId] = Offset.zero;
-        playerPositions.value = updatedPos;
 
         _broadcastLobbyState();
         break;
@@ -405,9 +486,7 @@ class NetManager {
           updatedPos[senderId] = Offset(x, y);
           playerPositions.value = updatedPos;
         }
-
-        // Relay to guest
-        _transport.sendEvent(event);
+        // No relay: 1v1, the only client is the sender (echo would clobber its score).
         break;
 
       case 'player_finished':
@@ -443,6 +522,7 @@ class NetManager {
       case 'peer_disconnected':
         final droppedId = event['playerId'] as String?;
         if (droppedId != null) {
+          final droppedName = players.value[droppedId] ?? 'Guest';
           final updated = Map<String, String>.from(players.value);
           updated.remove(droppedId);
           players.value = updated;
@@ -469,10 +549,10 @@ class NetManager {
                 'forfeit': true,
               },
               {
-                'id': '2',
-                'name': 'Guest',
-                'score': playerScores.value['2'] ?? 0,
-                'coins': playerCoins.value['2'] ?? 0,
+                'id': droppedId,
+                'name': droppedName,
+                'score': playerScores.value[droppedId] ?? 0,
+                'coins': playerCoins.value[droppedId] ?? 0,
                 'timeBonus': 0,
                 'timeLeft': 0.0,
                 'won': false,
@@ -486,7 +566,7 @@ class NetManager {
         break;
 
       case 'return_to_lobby':
-        returnToLobby();
+        _resetForLobby(); // reset only; echoing would bounce forever
         break;
     }
   }
@@ -514,21 +594,7 @@ class NetManager {
         opponentDisconnected.value = false;
         _finishedPlayers.clear();
         _finishDetails.clear();
-
-        final Map<String, int> scores = {};
-        final Map<String, int> coins = {};
-        final Map<String, double> progs = {};
-        final Map<String, Offset> pos = {};
-        for (final id in players.value.keys) {
-          scores[id] = 0;
-          coins[id] = 0;
-          progs[id] = 0.0;
-          pos[id] = Offset.zero;
-        }
-        playerScores.value = scores;
-        playerCoins.value = coins;
-        playerProgress.value = progs;
-        playerPositions.value = pos;
+        _zeroScores();
         break;
 
       case 'score_event':
@@ -597,13 +663,17 @@ class NetManager {
           ];
           matchWinnerId.value = localPlayerId;
           finalScoreboard.value = board;
+          isConnected.value = false; // stop sending on the dead socket
+        } else if (finalScoreboard.value != null) {
+          // Keep the final board visible; just mark the link dead.
+          isConnected.value = false;
         } else {
           disconnect();
         }
         break;
 
       case 'return_to_lobby':
-        returnToLobby();
+        _resetForLobby(); // reset only; echoing would bounce forever
         break;
     }
   }
@@ -611,7 +681,7 @@ class NetManager {
   void _broadcastLobbyState() {
     _transport.sendEvent({
       'type': 'lobby_state',
-      'assignedId': '2',
+      'assignedId': _guestId,
       'level': selectedLevel,
       'players': players.value,
     });
@@ -629,21 +699,7 @@ class NetManager {
     matchWinnerId.value = null;
     finalScoreboard.value = null;
     opponentDisconnected.value = false;
-
-    final Map<String, int> scores = {};
-    final Map<String, int> coins = {};
-    final Map<String, double> progs = {};
-    final Map<String, Offset> pos = {};
-    for (final id in players.value.keys) {
-      scores[id] = 0;
-      coins[id] = 0;
-      progs[id] = 0.0;
-      pos[id] = Offset.zero;
-    }
-    playerScores.value = scores;
-    playerCoins.value = coins;
-    playerProgress.value = progs;
-    playerPositions.value = pos;
+    _zeroScores();
 
     _transport.sendEvent({
       'type': 'start_match',
@@ -799,28 +855,7 @@ class NetManager {
 
   /// Rematch: Reset match state so both players return to lobby cleanly.
   void returnToLobby() {
-    isMatchStarted.value = false;
-    matchWinnerId.value = null;
-    finalScoreboard.value = null;
-    opponentDisconnected.value = false;
-    _finishedPlayers.clear();
-    _finishDetails.clear();
-
-    final Map<String, int> scores = {};
-    final Map<String, int> coins = {};
-    final Map<String, double> progs = {};
-    final Map<String, Offset> pos = {};
-    for (final id in players.value.keys) {
-      scores[id] = 0;
-      coins[id] = 0;
-      progs[id] = 0.0;
-      pos[id] = Offset.zero;
-    }
-    playerScores.value = scores;
-    playerCoins.value = coins;
-    playerProgress.value = progs;
-    playerPositions.value = pos;
-
+    _resetForLobby();
     if (isConnected.value) {
       _transport.sendEvent({
         'type': 'return_to_lobby',
@@ -829,10 +864,34 @@ class NetManager {
     }
   }
 
+  /// Local-only lobby reset (never sends, so the peer's handler can reuse it).
+  void _resetForLobby() {
+    isMatchStarted.value = false;
+    matchWinnerId.value = null;
+    finalScoreboard.value = null;
+    opponentDisconnected.value = false;
+    _finishedPlayers.clear();
+    _finishDetails.clear();
+    _zeroScores();
+  }
+
+  /// Zero every player's score/coins/progress; positions stay empty until reported.
+  void _zeroScores() {
+    final ids = players.value.keys;
+    playerScores.value = {for (final id in ids) id: 0};
+    playerCoins.value = {for (final id in ids) id: 0};
+    playerProgress.value = {for (final id in ids) id: 0.0};
+    playerPositions.value = {};
+  }
+
   /// Disconnect and reset all state.
   Future<void> disconnect() async {
     _eventSubscription?.cancel();
     _eventSubscription = null;
+    _beacon?.cancel();
+    _beacon = null;
+    _beaconSocket?.close();
+    _beaconSocket = null;
 
     await _transport.disconnect();
 

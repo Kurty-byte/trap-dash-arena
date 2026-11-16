@@ -363,11 +363,6 @@ class TrapDashGame extends FlameGame
     KeyEvent event,
     Set<LogicalKeyboardKey> keysPressed,
   ) {
-    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.f1) {
-      GameState.instance.toggleDevMode();
-      return KeyEventResult.handled;
-    }
-
     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.escape) {
       if (overlays.isActive('PauseOverlay')) {
         resumeGame();

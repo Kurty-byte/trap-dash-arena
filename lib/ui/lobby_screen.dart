@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:trap_dash_arena/autoload/audio_manager.dart';
@@ -26,7 +27,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
   String _hostIp = 'Fetching IP...';
   int _selectedLevel = 1;
   bool _isConnecting = false;
-  StreamSubscription? _matchSubscription;
+  bool _scanning = false;
+  List<DiscoveredHost>? _hosts;
 
   @override
   void initState() {
@@ -39,7 +41,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   @override
   void dispose() {
-    _matchSubscription?.cancel();
     _net.isMatchStarted.removeListener(_onMatchStartedChanged);
     _ipController.dispose();
     _nameController.dispose();
@@ -83,12 +84,35 @@ class _LobbyScreenState extends State<LobbyScreen> {
       );
       if (mounted) setState(() {});
     } catch (_) {
-      _showErrorDialog(NetManager.errorWifiMessage);
+      if (mounted) _showErrorDialog('Could not open port ${NetManager.defaultPort}. Close other apps using it.');
     }
   }
 
+  Future<void> _handleScan() async {
+    setState(() {
+      _scanning = true;
+      _hosts = null;
+    });
+    final found = await NetManager.discoverHosts();
+    if (mounted) {
+      setState(() {
+        _scanning = false;
+        _hosts = found;
+      });
+    }
+  }
+
+  void _quickJoin(DiscoveredHost h) {
+    _ipController.text = '${h.ip}:${h.port}';
+    _handleConnectGuest();
+  }
+
   Future<void> _handleConnectGuest() async {
-    final ip = _ipController.text.trim();
+    // Accept a pasted "ip:port" as well as a bare ip.
+    final parts = _ipController.text.trim().split(':');
+    final ip = parts.first;
+    final port = (parts.length > 1 ? int.tryParse(parts.last) : null) ??
+        NetManager.defaultPort;
     if (ip.isEmpty) {
       _showErrorDialog('Please enter the host IP address.');
       return;
@@ -105,10 +129,16 @@ class _LobbyScreenState extends State<LobbyScreen> {
     try {
       await _net.joinGame(
         host: ip,
+        port: port,
         nickname: nick,
         timeout: const Duration(seconds: 5),
       );
       if (mounted) setState(() => _isConnecting = false);
+    } on SocketException catch (e) {
+      if (mounted) {
+        setState(() => _isConnecting = false);
+        _showErrorDialog(e.message);
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _isConnecting = false);
@@ -553,6 +583,63 @@ class _LobbyScreenState extends State<LobbyScreen> {
                           ),
                   ),
                 ),
+                const SizedBox(height: 10),
+
+                // Quick match: scan LAN for open hosts
+                SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppPalette.brownDark,
+                      foregroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(
+                        side: BorderSide(color: AppPalette.playerBlack, width: 2),
+                      ),
+                    ),
+                    onPressed: (_isConnecting || _scanning) ? null : _handleScan,
+                    child: _scanning
+                        ? const Text(
+                            'SCANNING...',
+                            style: TextStyle(fontFamily: 'PressStart2P', fontSize: 12),
+                          )
+                        : const Text(
+                            'FIND HOSTS',
+                            style: TextStyle(fontFamily: 'PressStart2P', fontSize: 12),
+                          ),
+                  ),
+                ),
+                if (_hosts != null) ...[
+                  const SizedBox(height: 8),
+                  if (_hosts!.isEmpty)
+                    const Text(
+                      'No open hosts found. Enter the IP manually.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'AtkinsonHyperlegible',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppPalette.textDark,
+                      ),
+                    ),
+                  for (final h in _hosts!)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppPalette.yellowBackground,
+                          foregroundColor: AppPalette.playerBlack,
+                          shape: const RoundedRectangleBorder(
+                            side: BorderSide(color: AppPalette.brownSolid, width: 2),
+                          ),
+                        ),
+                        onPressed: _isConnecting ? null : () => _quickJoin(h),
+                        child: Text(
+                          '${h.name}  -  STAGE ${h.level}  (${h.ip})',
+                          style: const TextStyle(fontFamily: 'PressStart2P', fontSize: 10),
+                        ),
+                      ),
+                    ),
+                ],
               ] else ...[
                 // Connected state
                 Container(

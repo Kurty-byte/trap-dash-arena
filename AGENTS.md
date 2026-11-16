@@ -21,7 +21,7 @@
 | **Tilemaps** | `flame_tiled` (`^1.21.0`) | Loading Tiled `.tmx` maps (`Level01.tmx`–`Level05.tmx`) with programmatic fallback |
 | **Local Storage** | `shared_preferences` (`^2.3.3`) | Persistence of `unlocked_level`, `best_stars`, `audio_muted`, `high_contrast_tells`, `ai_bot_enabled`, `player_nickname` |
 | **Audio** | `flame_audio` (`^2.10.6`) | Menu BGM (`bgm.mp3`) and pooled low-latency SFX (`.wav`) |
-| **Networking** | Dart `dart:io` (`HttpServer`, `WebSocket`) | 2–5 player local Wi-Fi / hotspot real-time score & progress sync (`MatchTransport` / `LocalWsTransport`) |
+| **Networking** | Dart `dart:io` (`HttpServer`, `WebSocket`) | 1v1 local Wi-Fi / hotspot real-time score & progress sync (`MatchTransport` / `LocalWsTransport`) |
 | **Fonts** | `PressStart2P`, `AtkinsonHyperlegible` | Accessible arcade UI typography ($\ge 28\text{ px}$ body text equivalent) |
 
 ---
@@ -50,7 +50,7 @@ trap_dash_arena/
 │   │   ├── audio_manager.dart              # Singleton: BGM lifecycle, AudioPool SFX, NoopAudioBackend for tests
 │   │   ├── game_state.dart                 # Singleton: level unlocks, star ratings, settings, SharedPreferences persistence
 │   │   ├── match_transport.dart            # Abstract transport interface for multiplayer session testing
-│   │   ├── net_manager.dart                # Singleton: 2-5 player WebSocket host/join (port 7777), scoreboard adjudication
+│   │   ├── net_manager.dart                # Singleton: 1v1 WebSocket host/join (port 7777), scoreboard adjudication
 │   │   └── palette.dart                    # Centralized AppPalette color constants
 │   ├── game/
 │   │   ├── trap_dash_game.dart             # FlameGame root: 1280x720 fixed camera, room panning, trauma shake, overlays
@@ -83,7 +83,7 @@ trap_dash_arena/
 │       ├── game_screen.dart                # GameWidget host registering Hud, TouchControls, Respawn, Pause, Result overlays
 │       ├── hud_overlay.dart                # Top bezel HUD: Pause/Restart, Hearts/Dev toggle, Room squares, Goal banner, Timer, Score
 │       ├── level_select_screen.dart        # 5-level selection grid with padlocks and 1-3 star indicators
-│       ├── lobby_screen.dart               # Host/Join UI, IP copy, 2-5 player lobby list, 5s timeout error modal
+│       ├── lobby_screen.dart               # Host/Join UI, IP copy, 1v1 lobby list, 5s timeout error modal
 │       ├── main_menu_screen.dart           # Play, Settings, Credits navigation
 │       ├── mode_select_screen.dart         # Play Offline vs. Play Online selection
 │       ├── pause_overlay.dart              # Resume, Restart, Audio mute toggle, Quit to Menu
@@ -192,7 +192,7 @@ class GameState {
 ## 7. Multiplayer & Networking Architecture (`NetManager`)
 
 ### 7.1 Architecture & Scope
-* **Player Capacity:** $2\text{ to }5$ players ($1\text{ Host} + \text{up to } 4\text{ Guests}$, `NetManager.maxClients = 4`).
+* **Player Capacity:** 1v1 only (1 Host + 1 Guest, `NetManager.maxClients = 1`; host answers HTTP 503 when full).
 * **Protocol & Port:** Dart `HttpServer` + `WebSocket` on port `7777` via `MatchTransport` / `LocalWsTransport`.
 * **Sync Strategy:** Event-driven score race; no frame-by-frame physics replication. Each client runs their stage locally and transmits score changes immediately (and normalized progress at up to $4\text{ Hz}$ when changed by $\ge 1\%$).
 
@@ -258,7 +258,7 @@ Lightweight JSON messages exchanged over WebSocket:
 | **R4** | Level unlocking ($n+1$ locked until $n$ cleared) | `GameState.isUnlocked(level)` checks `level <= unlockedLevel`; `LevelSelectScreen` renders padlock icons and disables locked level tiles. |
 | **R5** | Persistence survives closing application | `GameState.completeLevel()` persists `unlocked_level` & JSON-encoded `best_stars` via `SharedPreferences` (plus settings in `GameState.init()`). |
 | **R6** | Offline mode in Airplane Mode | Fully functional in Airplane Mode with zero network dependencies; includes toggleable `SimpleAI` ghost runner & live HUD `BOT` score counter. |
-| **R7** | Real-time 2–5 player multiplayer | `NetManager` & `LocalWsTransport` Host/Join on port `7777` (`maxClients = 4`), live HUD leaderboard in `HudOverlay`, Host adjudicates winner (`announce_winner`) and renders final standings in `ResultOverlay`. |
+| **R7** | Real-time 1v1 multiplayer | `NetManager` & `LocalWsTransport` Host/Join on port `7777` (`maxClients = 1`), live HUD rival bar in `HudOverlay`, Host adjudicates winner (`announce_winner`) and renders final standings in `ResultOverlay`. |
 | **R8** | Mode select & connection error handling | `ModeSelectScreen` (`Play Offline` / `Play Online`); 5s timeout in `LocalWsTransport.joinSession` displays `"Cannot reach host. Check that you are on the same Wi-Fi."` via `ArcadeDialog`. |
 | **R9** | Touch controls, fixed orientation on real phone | Fixed landscape (`1280x720`), multi-touch `Listener` pads in `TouchControlsOverlay` (`148x124` Left/Right, `156x128` Jump), Android APK build. |
 | **R10** | Polish: title, pause, sound toggle, font size | `TitleScreen`, `PauseOverlay` (`pauseEngine()`/`resumeEngine()`), `RespawnOverlay`, `AudioManager` persisted mute toggle, accessible typography, `CREDITS.md` & `CreditsScreen`. |

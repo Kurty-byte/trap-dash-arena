@@ -299,9 +299,9 @@ void main() {
     final square2Center = tester.getCenter(find.byKey(const Key('hud_platform_square_2')));
     expect(square2Center.dx, equals(640.0));
 
-    // Toggle Dev Mode (adds DEV ∞ badge on left, hides timer on right)
-    final heartsToggle = find.byKey(const Key('hud_dev_hearts_toggle'));
-    await tester.tap(heartsToggle);
+    // Enable Dev Mode programmatically (adds DEV ∞ badge on left, hides timer on right)
+    addTearDown(() => GameState.instance.setDevMode(false));
+    GameState.instance.setDevMode(true);
     await tester.pump();
 
     // Center must remain invariant at x = 640.0

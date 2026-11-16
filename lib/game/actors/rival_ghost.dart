@@ -14,9 +14,7 @@ class RivalGhost extends PositionComponent with HasGameReference<TrapDashGame> {
   String _rivalName = 'Rival';
   bool _facingLeft = false;
 
-  List<Sprite>? _sprites;
-  int _currentFrame = 0;
-  double _animTimer = 0.0;
+  Sprite? _sprite; // static idle frame only: rival is never animated
 
   TextPainter? _nameTagPainter;
 
@@ -38,12 +36,8 @@ class RivalGhost extends PositionComponent with HasGameReference<TrapDashGame> {
     try {
       final img = game.tryGetCachedImage('game/player.png');
       if (img != null) {
-        _sprites = [
-          Sprite(img, srcPosition: Vector2(0, 0), srcSize: Vector2(48, 76)),
-          Sprite(img, srcPosition: Vector2(48, 0), srcSize: Vector2(48, 76)),
-          Sprite(img, srcPosition: Vector2(96, 0), srcSize: Vector2(48, 76)),
-          Sprite(img, srcPosition: Vector2(144, 0), srcSize: Vector2(48, 76)),
-        ];
+        // Same 40x64 frame grid as Player; frame 0 = idle.
+        _sprite = Sprite(img, srcPosition: Vector2(0, 0), srcSize: Vector2(40, 64));
       }
     } catch (_) {}
 
@@ -127,18 +121,6 @@ class RivalGhost extends PositionComponent with HasGameReference<TrapDashGame> {
       position.x = _prevPos.x + (_targetPos.x - _prevPos.x) * t;
       position.y = _prevPos.y + (_targetPos.y - _prevPos.y) * t;
     }
-
-    // Walk animation if moving
-    final isMoving = (position - _prevPos).length > 1.0;
-    if (isMoving && _sprites != null && _sprites!.length >= 4) {
-      _animTimer += dt;
-      if (_animTimer >= 0.10) {
-        _animTimer = 0.0;
-        _currentFrame = (_currentFrame + 1) % 4;
-      }
-    } else {
-      _currentFrame = 0;
-    }
   }
 
   @override
@@ -180,8 +162,8 @@ class RivalGhost extends PositionComponent with HasGameReference<TrapDashGame> {
     final ghostPaint = Paint()
       ..color = const Color.fromARGB(115, 0, 0, 0); // ~45% opacity
 
-    if (_sprites != null && _sprites!.length > _currentFrame) {
-      _sprites![_currentFrame].render(
+    if (_sprite != null) {
+      _sprite!.render(
         canvas,
         size: size,
         overridePaint: ghostPaint,
